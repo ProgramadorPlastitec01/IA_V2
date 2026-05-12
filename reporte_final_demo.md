@@ -41,7 +41,7 @@ Se ha realizado una auditoría completa del sistema, simulando interacciones cr�
 ### Acceso al Dashboard de Administrador
 Para la demo, se puede mostrar el panel de métricas en tiempo real:
 - **Método 1:** Hacer clic **5 veces** rápido sobre el logo de Plastitec. Se abrirá en una pestaña nueva.
-- **URL Directa:** `http://localhost:5173/?dashboard=true`
+- **URL Directa:** `http://localhost:5180/?dashboard=true`
 
 ### Escenarios de Prueba Recomendados (Demo Script)
 1.  **Presentación:** Preguntar "¿Quién eres?" (Respuesta instantánea local).

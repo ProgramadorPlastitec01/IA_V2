@@ -1,6 +1,6 @@
 /**
  * QuickCache.js
- * Caché en memoria para evitar llamadas redundantes a NotebookLM.
+ * Caché en memoria para evitar llamadas redundantes al backend RAG.
  * Lógica LRU (Least Recently Used) básica.
  */
 

@@ -30,11 +30,11 @@ start "1. Backend API (Server)" cmd /k "npm run server"
 :: Esperar 5 segundos para que el backend arranque
 timeout /t 5 /nobreak >nul
 
-:: Iniciar Frontend (Puerto 5173)
+:: Iniciar Frontend (Puerto 5180)
 start "2. Frontend React (Client)" cmd /k "npm run dev"
 
-:: Iniciar Ngrok (Puerto 5173 -> Publico)
-start "3. Ngrok Tunnel" cmd /k "ngrok http 5173"
+:: Iniciar Ngrok (Puerto 5180 -> Publico)
+start "3. Ngrok Tunnel" cmd /k "ngrok http 5180"
 
 echo.
 echo ================================================
@@ -42,6 +42,6 @@ echo    SISTEMA REINICIADO EXITOSAMENTE
 echo ================================================
 echo.
 echo Por favor, espera unos segundos y recarga tu navegador en:
-echo    http://localhost:5173
+echo    http://localhost:5180
 echo.
 pause

@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => ({
   ],
   server: {
     host: true, // Esto habilita el acceso desde la red local
-    port: 5173,  // Puerto por defecto
+    port: 5180,  // Puerto por defecto
     allowedHosts: [
       'localhost'         // Permitir localhost
     ],

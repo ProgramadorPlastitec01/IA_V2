@@ -12,10 +12,12 @@
 
 export const CATEGORIES = {
     REGLAMENTO: 'reglamento',
+    CORPORATIVA: 'corporativa',
     CONFIDENCIAL: 'confidencial',
     FUERA_DE_DOMINIO: 'fuera_de_dominio',
     CASUAL: 'casual',
-    MALICIOSA: 'maliciosa'
+    MALICIOSA: 'maliciosa',
+    ESTANDAR: 'estandar'
 };
 
 const SENSITIVE_KEYWORDS = [
@@ -66,7 +68,7 @@ class PrivacyService {
         }
 
         // Por defecto, si llegamos aquí y no hay una consulta del RIT clara, 
-        // la IA debería haber determinado si es reglamento o fuera_de_dominio.
+        // la IA debería haber determinado si es reglamento, corporativa o fuera_de_dominio.
         return CATEGORIES.REGLAMENTO;
     }
 

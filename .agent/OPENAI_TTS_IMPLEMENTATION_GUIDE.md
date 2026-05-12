@@ -98,7 +98,7 @@ PORT=3000
 NODE_ENV=development
 
 # CORS Configuration
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+ALLOWED_ORIGINS=http://localhost:5180,http://localhost:3000
 
 # NotebookLM Configuration
 NOTEBOOK_NAME=RRHH
@@ -153,7 +153,7 @@ npm install openai
 
 ### PASO 5: Probar la Integración
 
-1. **Abrir la aplicación:** http://localhost:5173
+1. **Abrir la aplicación:** http://localhost:5180
 2. **Hacer una consulta de voz**
 3. **Verificar en la consola del navegador (F12):**
 
@@ -299,7 +299,7 @@ P: ${query}`;
 
 4. **CORS configurado**
    ```javascript
-   ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+   ALLOWED_ORIGINS=http://localhost:5180,http://localhost:3000
    ```
 
 ---

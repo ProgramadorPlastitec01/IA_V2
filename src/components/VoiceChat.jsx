@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import notebookLMClient from '../utils/notebookLMClient';
+import aiClient from '../utils/aiClient';
 import IntentEngine from '../utils/NexusIntentEngine'; // Updated import
 import { API_BASE_URL } from '../utils/apiConfig';
 import NexusCore from './NexusCore';
@@ -141,8 +141,8 @@ const VoiceChat = () => {
             console.error('[VoiceChat] Navegador no soporta Web Speech API');
             return;
         }
-        notebookLMClient.initialize();
-        notebookLMClient.resetConversation(); // Clear cache on startup to avoid 'Sy' bug
+        aiClient.initialize();
+        aiClient.resetConversation(); // Clear RAM cache on startup
     }, []);
 
 
@@ -271,7 +271,7 @@ const VoiceChat = () => {
         try {
             abortControllerRef.current = new AbortController();
             console.log(`[Timing] ${(performance.now() - qStart).toFixed(0)}ms — sending to backend`);
-            const result = await notebookLMClient.query(queryText, {
+            const result = await aiClient.query(queryText, {
                 signal: abortControllerRef.current.signal
             });
             console.log(`[Timing] ${(performance.now() - qStart).toFixed(0)}ms — backend responded`);
@@ -542,6 +542,36 @@ const VoiceChat = () => {
         console.log('🚀 Activating app via direct user interaction...');
 
         try {
+            // ── GUARD: mediaDevices SOLO existe en contextos seguros (HTTPS o localhost) ──
+            // Chrome/Edge eliminan navigator.mediaDevices completamente en HTTP + IP de red.
+            if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+                const isHTTP = window.location.protocol === 'http:';
+                const isNonLocalhost = window.location.hostname !== 'localhost' 
+                    && window.location.hostname !== '127.0.0.1';
+
+                console.warn('[Mic] mediaDevices NO disponible.', {
+                    protocol: window.location.protocol,
+                    hostname: window.location.hostname,
+                    isSecureContext: window.isSecureContext,
+                    mediaDevicesExists: !!navigator.mediaDevices
+                });
+
+                reportError('Mic', 'activateApp', 'mediaDevices not available', null, {
+                    phase: 'PreActivation',
+                    protocol: window.location.protocol,
+                    hostname: window.location.hostname,
+                    isSecure: window.isSecureContext
+                });
+
+                if (isHTTP && isNonLocalhost) {
+                    setError('⚠️ Micrófono requiere HTTPS. Usando modo teclado. (Conecta vía localhost o habilita HTTPS)');
+                } else {
+                    setError('Micrófono no disponible en este navegador. Usando modo teclado.');
+                }
+                setAppState('IDLE');
+                return;
+            }
+
             // 1. Solicitar permisos DIRECTAMENTE en el evento de click
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -589,11 +619,19 @@ const VoiceChat = () => {
             reportError('Mic', 'activateApp', e.message, e.stack, {
                 phase: 'CriticalActivation',
                 errorName: e.name,
-                isSecure: window.isSecureContext
+                isSecure: window.isSecureContext,
+                protocol: window.location.protocol,
+                hostname: window.location.hostname
             });
 
-            // Si falla, al menos dejamos entrar para escritura manual
-            setError('No pudimos activar el micrófono. Usando modo teclado.');
+            // Mensaje diferenciado según el tipo de error
+            if (e.name === 'NotAllowedError') {
+                setError('Permiso de micrófono denegado. Habilita el micrófono en configuración del navegador.');
+            } else if (e.name === 'NotFoundError') {
+                setError('No se encontró micrófono conectado. Usando modo teclado.');
+            } else {
+                setError('No pudimos activar el micrófono. Usando modo teclado.');
+            }
             setAppState('IDLE');
         }
     };
@@ -822,7 +860,7 @@ const VoiceChat = () => {
                                         <span className="text-white text-lg font-black">{performanceMetrics.transMs}ms</span>
                                     </div>
                                     <div className="flex flex-col border-l-2 border-purple-500/30 pl-4 py-2">
-                                        <span className="text-white/30 text-[10px] mb-2 uppercase tracking-tighter">NotebookLM</span>
+                                        <span className="text-white/30 text-[10px] mb-2 uppercase tracking-tighter">RAG Local</span>
                                         <span className="text-white text-lg font-black">Online IA</span>
                                     </div>
                                     <div className="flex flex-col border-l-2 border-blue-400 pl-4 py-2 bg-blue-500/5 rounded-r-2xl border-y border-r border-blue-500/10 shadow-inner">

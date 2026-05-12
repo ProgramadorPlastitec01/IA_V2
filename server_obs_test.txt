@@ -1,0 +1,26 @@
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+{"timestamp":"2026-05-07T13:44:57.966Z","level":"info","service":"EmbeddingsService","msg":"Inicializado","provider":"Ollama","model":"nomic-embed-text","url":"http://localhost:11434"}
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+{"timestamp":"2026-05-07T13:44:57.967Z","level":"info","service":"GemmaService","msg":"Servicio Gemma inicializado","url":"http://localhost:11434","model":"gemma"}
+
+🔍 Iniciando Pre-flight Check de dependencias...
+   - Verificando Ollama en http://localhost:11434...
+     ✅ Modelo gemma encontrado.
+     ✅ Modelo nomic-embed-text encontrado.
+   ✅ Ollama está activo y configurado.
+   - Verificando Qdrant en http://localhost:6333...
+   ✅ Qdrant está activo.
+✅ Pre-flight Check completado con éxito.
+
+✅ SQLite Cache Database inicializada en: C:\AIV2\hr_cache.db
+✅ SQLite Cache Database inicializada.
+{"timestamp":"2026-05-07T13:44:58.029Z","level":"info","service":"QdrantService","msg":"Colección verificada","collection":"rrhh_docs"}
+✅ Qdrant collection lista.
+
+🚀 Asistente RRHH IA Backend corriendo en puerto 3001 
+   Acceso Red: http://172.16.1.164:3001 /AsistenteRRHH
+   Acceso Red: http://192.168.56.1:3001 /AsistenteRRHH
+   Acceso Red: http://172.24.96.1:3001 /AsistenteRRHH
+
+[OK] Servidor listo para peticiones.

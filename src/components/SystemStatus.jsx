@@ -112,7 +112,7 @@ const SystemStatus = () => {
                 <div className="font-mono text-[10px] text-white/30 space-y-1">
                     <div>[INF] System check initiated by admin user via web console.</div>
                     <div>[INF] Database integrity check passed (latency: {stats?.services[1]?.latency}ms).</div>
-                    <div>[INF] NotebookLM heartbeat {stats?.services[2]?.status === 'active' ? 'successful' : 'failed'}.</div>
+                    <div>[INF] Qdrant Vector DB heartbeat {stats?.services[2]?.status === 'active' ? 'successful' : 'failed'}.</div>
                 </div>
             </div>
         </div>

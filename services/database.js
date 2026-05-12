@@ -7,7 +7,7 @@
  * Características:
  * - UPSERT real: INSERT OR IGNORE + UPDATE para evitar duplicados
  * - UNIQUE INDEX sobre question_normalized
- * - Campo `source` para trazabilidad (notebooklm | demo)
+ * - Campo `source` para trazabilidad (gemma_rag | demo)
  * - Campo `knowledge_version` para revalidación inteligente
  * - Búsqueda por similitud con Dice Coefficient
  * - Auto-limpieza cuando se supera MAX_RECORDS
@@ -55,7 +55,7 @@ class DatabaseService {
                     question_normalized  TEXT    NOT NULL,
                     answer               TEXT    NOT NULL,
                     category             TEXT    DEFAULT 'general',
-                    source               TEXT    DEFAULT 'notebooklm',
+                    source               TEXT    DEFAULT 'gemma_rag',
                     knowledge_version    INTEGER DEFAULT 0,
                     last_validated       DATETIME DEFAULT CURRENT_TIMESTAMP,
                     usage_count          INTEGER DEFAULT 1,
@@ -69,7 +69,7 @@ class DatabaseService {
             const colNames = cols.map(c => c.name);
 
             if (!colNames.includes('source')) {
-                await this.db.exec(`ALTER TABLE knowledge_base ADD COLUMN source TEXT DEFAULT 'notebooklm'`);
+                await this.db.exec(`ALTER TABLE knowledge_base ADD COLUMN source TEXT DEFAULT 'gemma_rag'`);
                 console.log('🔧 [DB Migration] Columna "source" agregada');
             }
             if (!colNames.includes('knowledge_version')) {
@@ -137,7 +137,7 @@ class DatabaseService {
     }
 
     /**
-     * Determina si un registro requiere revalidación contra NotebookLM.
+     * Determina si un registro de caché requiere revalidación (por versión o antigüedad).
      *
      * Criterios:
      * 1. knowledge_version del registro < versión actual del sistema
@@ -208,7 +208,7 @@ class DatabaseService {
      * Siempre actualiza knowledge_version y last_validated.
      *
      * @param {number} id
-     * @param {string} newAnswer     Nueva respuesta de NotebookLM (puede ser null si no cambió)
+     * @param {string} newAnswer     Nueva respuesta del LLM (puede ser null si no cambió)
      * @param {number} currentVersion
      * @returns {Promise<'updated'|'touched'>}
      */
@@ -329,7 +329,7 @@ class DatabaseService {
      * @param {number} knowledgeVersion
      * @returns {Promise<'inserted'|'updated'|'skipped'>}
      */
-    async storeOrUpdate(questionOriginal, answer, category = 'general', source = 'notebooklm', knowledgeVersion = 0) {
+    async storeOrUpdate(questionOriginal, answer, category = 'general', source = 'gemma_rag', knowledgeVersion = 0) {
         if (!this.db) {
             console.warn('⚠️ [SQLite] DB no inicializada, no se puede guardar.');
             return 'skipped';
@@ -375,7 +375,7 @@ class DatabaseService {
 
     /** @deprecated Usar storeOrUpdate() */
     async store(questionOriginal, answer, category = 'general') {
-        return this.storeOrUpdate(questionOriginal, answer, category, 'notebooklm', 0);
+        return this.storeOrUpdate(questionOriginal, answer, category, 'gemma_rag', 0);
     }
 
     async incrementUsage(id) {

@@ -267,7 +267,7 @@ const AnalyticsDashboard = ({ onClose }) => {
                             <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-xl">
                                 <div className="text-purple-400/60 text-xs uppercase mb-1">Consultas Remotas</div>
                                 <div className="text-3xl font-bold text-purple-400">{stats.remote}</div>
-                                <div className="text-[10px] text-purple-400/40">NotebookLM AI</div>
+                                <div className="text-[10px] text-purple-400/40">RAG Engine</div>
                             </div>
                             <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl relative overflow-hidden">
                                 <div className="text-blue-400/60 text-xs uppercase mb-1">Tiempo Ahorrado</div>

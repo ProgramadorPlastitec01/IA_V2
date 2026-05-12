@@ -89,7 +89,7 @@ class IntentEngine {
             return { type: 'emergency', response: getRandomResponse('emergency'), confidence: 1.0 };
         }
 
-        // Si no coincide con nada trivial, delegamos a NotebookLM (Backend)
+        // Si no coincide con nada trivial, delegamos al Backend RAG
         return { type: 'unknown', response: null, confidence: 0 };
     }
 }
