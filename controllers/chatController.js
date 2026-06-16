@@ -9,7 +9,7 @@ import { logAnalyticsEvent, logErrorEvent } from '../utils/logger.js';
 
 export const postQuery = async (req, res) => {
     const startTotal = Date.now();
-    const { query, conversationId } = req.body || {};
+    const { query, conversationId, bypass_cache } = req.body || {};
     const stats = {
         sqlite_ms: 0,
         embedding_ms: 0,
@@ -35,7 +35,7 @@ export const postQuery = async (req, res) => {
         }
 
         // 2. Búsqueda en Caché SQLite
-        if (initialCategory === CATEGORIES.REGLAMENTO) {
+        if (initialCategory === CATEGORIES.REGLAMENTO && !bypass_cache) {
             const startSqlite = Date.now();
             try {
                 const cachedResult = await DatabaseService.findSimilar(query);
@@ -83,7 +83,9 @@ export const postQuery = async (req, res) => {
         stats.total_ms = Date.now() - startTotal;
 
         // 4. Guardar en SQLite (Aprendizaje progresivo)
-        if (finalCategory === CATEGORIES.REGLAMENTO && !responseText.includes("No tengo información")) {
+        // bypass_cache también desactiva la escritura: una corrida de benchmark
+        // no debe contaminar la caché ni heredar respuestas entre tests.
+        if (finalCategory === CATEGORIES.REGLAMENTO && !bypass_cache && !responseText.includes("No tengo información")) {
             const KV_FILE = path.join(process.cwd(), 'knowledge_version.json');
             let kv = 0;
             try { kv = JSON.parse(fs.readFileSync(KV_FILE, 'utf8')).version || 0; } catch(e){}
@@ -103,6 +105,11 @@ export const postQuery = async (req, res) => {
             response: responseText,
             outOfScope: finalCategory !== CATEGORIES.REGLAMENTO,
             category: finalCategory,
+            confidence: ragResult.confidence || 0,
+            sources: ragResult.sources || [],
+            chunksUsed: ragResult.chunksUsed || 0,
+            retrievalLogs: ragResult.retrievalLogs || null,
+            context: ragResult.context || null,
             conversationId: conversationId || crypto.randomUUID()
         });
 

@@ -12,6 +12,23 @@ export const INTENT_CATEGORIES = {
     ESTANDAR: 'estandar'         // Consultas generales de RRHH
 };
 
+// ─── Patrones para clasificación de tipo de respuesta (Fase 3.0) ─────────────
+const PROCEDURE_PATTERNS = [
+    /^cómo\b/i, /^como\b/i,
+    /\b(cómo|como)\s+(reportar|solicitar|registrar|ingresar|realizar|hacer|tramitar|presentar|diligenciar|renovar|actualizar|obtener|gestionar|pedir|notificar|reporto|solicito)\b/i,
+    /^¿?cómo\b/i,
+    /\b(procedimiento|proceso|pasos|paso a paso|instrucciones)\b/i,
+    /\b(qué (debo|hay que|tengo que|se debe|se tiene que) hacer)\b/i,
+    /\b(reportar|solicitar|registrar|tramitar|diligenciar|presentar)\b.*(accidente|vacacion|permiso|licencia|incapacidad|certificado|queja|denuncia)/i,
+];
+
+const DETAILED_PATTERNS = [
+    /\b(explica(me)?|describe|detalla|amplia|desarrolla|qué es)\s+(el|la|los|las|todo|completo)\b/i,
+    /\b(qué es|qué son|define|definición de)\s+(el|la|los|las)?\s*(sagrilaft|sg-sst|copasst|bpm|rit|sena)\b/i,
+    /\b(todo(s)? (los|las)|completo|completa|en detalle|información completa)\b/i,
+    /\bexplícame (el|la|los|las)\b/i,
+];
+
 class IntentRoutingService {
     constructor() {
         this.keywords = {
@@ -23,7 +40,8 @@ class IntentRoutingService {
             [INTENT_CATEGORIES.NORMATIVA]: [
                 'seguridad', 'epp', 'casco', 'guantes', 'botas', 'gafas',
                 'reglamento', 'normas', 'reglas', 'sanciones', 'prohibiciones',
-                'obligaciones', 'faltas', 'disciplina', 'descargos', 'sst', 'ley'
+                'obligaciones', 'faltas', 'disciplina', 'descargos', 'sst', 'ley',
+                'copasst', 'sg-sst', 'sagrilaft', 'oea'
             ],
             [INTENT_CATEGORIES.PROCESOS]: [
                 'bpm', 'calidad', 'proceso', 'procedimiento', 'manufactura',
@@ -69,6 +87,22 @@ class IntentRoutingService {
     }
 
     /**
+     * Clasifica el tipo de respuesta necesario para determinar el modo LLM.
+     * Fase 3.0: SHORT_ANSWER | PROCEDURE | DETAILED_POLICY
+     * @param {string} query
+     * @returns {'SHORT_ANSWER'|'PROCEDURE'|'DETAILED_POLICY'}
+     */
+    classifyResponseType(query) {
+        if (DETAILED_PATTERNS.some(p => p.test(query))) {
+            return 'DETAILED_POLICY';
+        }
+        if (PROCEDURE_PATTERNS.some(p => p.test(query))) {
+            return 'PROCEDURE';
+        }
+        return 'SHORT_ANSWER';
+    }
+
+    /**
      * Retorna los parámetros de búsqueda específicos para una intención.
      * @param {string} intent 
      */
@@ -107,3 +141,5 @@ class IntentRoutingService {
 }
 
 export default new IntentRoutingService();
+
+

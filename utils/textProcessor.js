@@ -29,6 +29,25 @@ export const cleanResponse = (text) => {
     return processed
         .replace(/\[\d+\]/g, '')
         .replace(/^[ \t]*[\{\}][ \t]*$/gm, '')
+        .replace(/^"([\s\S]+)"$/, '$1')   // Strip outer quotes if LLM wraps in quotes
+        .trim();
+};
+
+// Informational question starters — these NEVER warrant "Sí" as opener
+const INFORMATIONAL_PREFIXES = /^[¿]?(qué|cuáles|cuál|cómo|cuándo|cuánto|cuánta|por qué|quiénes|dónde)\b/i;
+
+/**
+ * Strips spurious "Sí[,./]" openers from responses to informational questions.
+ * llama3.2 tends to open every response with "Sí, " regardless of question type.
+ */
+export const polarityAwareClean = (response, question) => {
+    if (!response || !question) return response;
+    const q = question.replace(/^¿/, '').trim();
+    if (!INFORMATIONAL_PREFIXES.test(q)) return response; // only fix informational questions
+    // Remove "Sí, " / "SÍ, " / '"Sí". ' at the very start
+    return response
+        .replace(/^["""']?Sí["""']?[,.\s]\s*/i, '')
+        .replace(/^["""']?SÍ["""']?[,.\s]\s*/i, '')
         .trim();
 };
 

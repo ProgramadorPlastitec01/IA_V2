@@ -81,7 +81,8 @@ app.use((err, req, res, next) => {
 });
 
 import appState from './utils/state.js';
-import gemmaService from './services/gemmaService.js';
+import llmService from './services/llmService.js';
+import neuralRerankingService from './services/neuralRerankingService.js';
 
 /**
  * Inicialización de Servicios y Arranque
@@ -109,11 +110,18 @@ async function startServer() {
             console.warn(`⚠️ Qdrant no disponible: ${qdrantError.message}`);
         }
 
-        // 3. Warm-up Gemma (Pre-carga en VRAM)
+        // 3. Warm-up LLM (Pre-carga en VRAM)
         console.log('🔥 [AI] Preparando motor de inferencia (Warm-up)...');
-        await gemmaService.warmUp();
+        await llmService.warmUp();
 
-        // 4. Listen
+        // 4. Warm-up Cross-Encoder (solo si está habilitado)
+        if (process.env.ENABLE_NEURAL_RERANKER === 'true') {
+            console.log('🧠 [CE] Precargando modelo Cross-Encoder en memoria...');
+            await neuralRerankingService.warmup();
+            console.log('✅ Cross-Encoder listo.');
+        }
+
+        // 5. Listen
         app.listen(PORT, '0.0.0.0', () => {
             appState.SERVER_READY = true;
             console.log(`\n🚀 Asistente RRHH IA Backend corriendo en puerto ${PORT}`);
@@ -128,8 +136,8 @@ async function startServer() {
             }
             console.log(`\n[READY] Servidor totalmente operativo.`);
             
-            // Mantener Gemma en VRAM cada 4 minutos
-            setInterval(() => gemmaService.keepAlive(), 240000);
+            // Mantener LLM en VRAM cada 4 minutos
+            setInterval(() => llmService.keepAlive(), 240000);
         });
 
     } catch (error) {
