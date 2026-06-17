@@ -344,7 +344,7 @@ class RagService {
             let finalResponse;
 
             try {
-                const { jsonFacts, citations } = await llmService.generateRAGResponse(query, contextText, session, confidence);
+                const { jsonFacts, citations } = await llmService.generateRAGResponse(query, contextText, session, confidence, sources);
                 const builtText = responseBuilderService.build(jsonFacts, responseType);
                 finalResponse = builtText + citations;
             } catch (err) {

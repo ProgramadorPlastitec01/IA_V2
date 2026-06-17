@@ -182,7 +182,7 @@ class LLMService {
      * Etapa 2: Generación guiada por Evidencia
      * Etapa 3: Validadores post-generación
      */
-    async generateRAGResponse(question, context, session = null, retrievalConfidence = 0) {
+    async generateRAGResponse(question, context, session = null, retrievalConfidence = 0, sources = []) {
         this._log('info', 'Iniciando Pipeline Tri-Estado (CoT XML)', { questionLen: question.length });
         
         const xmlPrompt = `<|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -235,32 +235,48 @@ PREGUNTA DEL EMPLEADO:
             finalResponseStr = "<clasificacion>NO_INFORMATION_FOUND</clasificacion>";
         }
         
-        let clasificacionMatch = finalResponseStr.match(/<clasificacion>([\s\S]*?)<\/clasificacion>/i);
-        let respuestaMatch = finalResponseStr.match(/<respuesta>([\s\S]*?)<\/respuesta>/i);
+        // Extrae el contenido de <respuesta> de forma TOLERANTE: si falta el tag
+        // de cierre </respuesta> (común en modelos 3B), recupera el texto desde
+        // <respuesta> hasta el final o hasta el primer marcador de fin de turno.
+        const extraerRespuesta = (str) => {
+            if (!str) return '';
+            const open = str.match(/<respuesta>/i);
+            if (!open) return '';
+            let tail = str.slice(open.index + open[0].length);
+            const cut = tail.search(/<\/respuesta>|<\|?\s*end\s*\|?>|<\|eot/i);
+            if (cut !== -1) tail = tail.slice(0, cut);
+            return tail.trim();
+        };
 
+        const clasificacionMatch = finalResponseStr.match(/<clasificacion>([\s\S]*?)<\/clasificacion>/i);
         let clasificacion = clasificacionMatch ? clasificacionMatch[1].trim() : "NO_INFORMATION_FOUND";
+        let respuestaFinal = extraerRespuesta(finalResponseStr);
 
-        // ── Defensa anti-truncamiento (2026-06-12) ────────────────────────────
-        // Clasificación positiva con <respuesta> vacía/ausente = el presupuesto
-        // de tokens se agotó antes de generar la respuesta. UN solo reintento
-        // con num_predict ampliado (+300) — sin loops para no disparar latencia.
+        // ── Defensa anti-truncamiento (corregida 2026-06-16) ──────────────────
+        // Truncamiento REAL = clasificación positiva Y <respuesta> SIN contenido
+        // útil (longitud 0 tras extracción tolerante). NO se dispara si hay
+        // contenido válido, aunque incluya "No encontré información sobre: X"
+        // (eso es un PARTIAL_MATCH legítimo, no un truncamiento).
         const positiveClass = clasificacion === 'FULL_MATCH' || clasificacion === 'PARTIAL_MATCH';
-        const respuestaVacia = !respuestaMatch || respuestaMatch[1].trim().length === 0;
+        const truncamientoReal = positiveClass && respuestaFinal.length === 0;
 
-        if (positiveClass && respuestaVacia) {
-            this._log('warn', '[LLMService] Respuesta truncada detectada — reintento con presupuesto ampliado');
+        if (truncamientoReal) {
+            this._log('warn', '[LLMService] Truncamiento real (<respuesta> vacía) — reintento con presupuesto ampliado');
             const mode = RESPONSE_MODES[this.responseMode] || RESPONSE_MODES.SHORT_ANSWER;
             try {
                 const retryStr = await this.generateResponse(
                     xmlPrompt, this.model, false,
                     { num_predict: mode.num_predict + 300 }
                 );
-                const retryClasif = retryStr.match(/<clasificacion>([\s\S]*?)<\/clasificacion>/i);
-                const retryResp   = retryStr.match(/<respuesta>([\s\S]*?)<\/respuesta>/i);
-                if (retryResp && retryResp[1].trim().length > 0) {
-                    clasificacionMatch = retryClasif || clasificacionMatch;
-                    respuestaMatch     = retryResp;
-                    clasificacion      = retryClasif ? retryClasif[1].trim() : clasificacion;
+                const retryResp = extraerRespuesta(retryStr);
+                // SEGURIDAD anti-degradación: solo adoptar el reintento si MEJORA
+                // (trae contenido). Como el original aquí está vacío, el reintento
+                // nunca puede degradar una respuesta buena; si el reintento también
+                // viene vacío, se conserva el original. Nunca degrada.
+                if (retryResp.length > 0) {
+                    respuestaFinal = retryResp;
+                    const retryClasif = retryStr.match(/<clasificacion>([\s\S]*?)<\/clasificacion>/i);
+                    if (retryClasif) clasificacion = retryClasif[1].trim();
                     console.log("\n--- RAW LLM OUTPUT (retry anti-truncamiento) ---\n" + retryStr + "\n----------------------\n");
                 }
             } catch (e) {
@@ -268,9 +284,7 @@ PREGUNTA DEL EMPLEADO:
             }
         }
 
-        let respuestaFinal = (respuestaMatch && respuestaMatch[1].trim().length > 0)
-            ? respuestaMatch[1].trim()
-            : "No se pudo extraer una respuesta clara.";
+        if (respuestaFinal.length === 0) respuestaFinal = "No se pudo extraer una respuesta clara.";
 
         this._log('info', 'Clasificación Tri-Estado completada', { clasificacion });
 
@@ -280,15 +294,15 @@ PREGUNTA DEL EMPLEADO:
                 citations: ""
             };
         } else {
-            // Fake evidence just so the citation builder works if needed
-            const fakeEvidence = [{
-                source: "Documentos de Plastitec",
-                exact_quote: "Respuesta sintetizada a partir del contexto.",
-                relevance: "Alta"
-            }];
+            // Citas con las fuentes REALES recuperadas (no genéricas). Si la
+            // "respuesta" es en realidad un rechazo/no-respuesta, NO se citan
+            // fuentes (no tiene sentido citar algo que no se respondió).
+            const REJECTION_MARKERS = ['no encontré información', 'no se encontró información', 'no se pudo extraer'];
+            const isRejection = REJECTION_MARKERS.some(m => respuestaFinal.toLowerCase().includes(m));
+            const evidence = (sources || []).filter(Boolean).map(s => ({ source: s }));
             return {
                 jsonFacts: { answer: respuestaFinal },
-                citations: citationBuilder.build(fakeEvidence, retrievalConfidence)
+                citations: isRejection ? '' : citationBuilder.build(evidence, retrievalConfidence)
             };
         }
     }

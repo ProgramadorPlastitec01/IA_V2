@@ -9,7 +9,34 @@
 
 const CONFIDENCE_THRESHOLD = 0.70; // Por debajo de esto se muestran fuentes automáticamente
 
+// Mapeo de nombre técnico de archivo → nombre humano legible (un solo lugar).
+// El match es por subcadena del código de documento, robusto a sufijos de
+// versión (ej. "_V006") y de planta (ej. "_Planta2").
+const DOC_DISPLAY_NAMES = [
+    { match: 'rit_plastitec', name: 'Reglamento Interno de Trabajo (RIT)' },
+    { match: 'i-rh-001',      name: 'Conocimiento de Plastitec' },
+    { match: 'i-rh-003',      name: 'Buenas Prácticas de Manufactura (BPM)' },
+    { match: 'i-rh-004',      name: 'Inducción SST' },
+    { match: 'i-rh-006',      name: 'Ingreso/Salida de Visitas - Planta 2' },
+    { match: 'i-rh-009',      name: 'Ingreso a Áreas Grises' },
+    { match: 'i-rh-010',      name: 'Ingreso a Áreas Negras' },
+    { match: 'i-rh-011',      name: 'Ingreso a Áreas Blancas' },
+    { match: 'i-rh-012',      name: 'Instructivo de Lavado de Manos' },
+    { match: 'i-rh-017',      name: 'Código de Ética' },
+];
+
 class CitationBuilder {
+
+    /**
+     * Mapea un nombre de archivo fuente a su nombre humano legible.
+     * Fallback: el nombre del archivo sin la extensión .md.
+     */
+    _displayName(src) {
+        if (!src) return null;
+        const lower = String(src).toLowerCase();
+        const hit = DOC_DISPLAY_NAMES.find(d => lower.includes(d.match));
+        return hit ? hit.name : String(src).replace(/\.md$/i, '');
+    }
 
     /**
      * Construye un bloque de citas a partir de la evidencia JSON extraída.
@@ -28,21 +55,23 @@ class CitationBuilder {
         const shouldShow = showSources || confidence < CONFIDENCE_THRESHOLD;
         if (!shouldShow) return '';
 
-        // Deduplicar fuentes
-        const sources = new Set();
+        // Deduplicar fuentes ya mapeadas a su nombre legible (varios chunks del
+        // mismo documento → una sola entrada humana).
+        const displaySources = new Set();
         evidenceArray.forEach(ev => {
-            if (ev.source) sources.add(ev.source);
+            const dn = this._displayName(ev.source);
+            if (dn) displaySources.add(dn);
         });
 
-        if (sources.size === 0) return '';
+        if (displaySources.size === 0) return '';
 
         const label = showSources
             ? '\n\n---\n**Fuente:**\n'
             : '\n\n---\n📎 *Información extraída de:*\n';
 
         let citationText = label;
-        Array.from(sources).forEach(src => {
-            citationText += `- ${src}\n`;
+        Array.from(displaySources).forEach(name => {
+            citationText += `- ${name}\n`;
         });
 
         return citationText;
