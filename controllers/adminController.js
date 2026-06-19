@@ -14,7 +14,7 @@ export const postVerifyPin = (req, res) => {
         console.log('🔓 [Security] PIN verificado con éxito');
         res.json({ success: true });
     } else {
-        console.warn('🔒 [Security] Intento de acceso fallido con PIN:', pin);
+        console.warn('🔒 [Security] Intento de acceso fallido (PIN incorrecto)');
         res.json({ success: false, error: 'PIN incorrecto' });
     }
 };

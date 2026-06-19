@@ -28,7 +28,7 @@ const QUICK_RESPONSES = {
         "¡Adiós! No dudes en volver si tienes más preguntas."
     ],
     emergency: [
-        "Para emergencias médicas o de seguridad, por favor contacta inmediatamente al 911 o al supervisor de planta. ¿Necesitas el número de RRHH directo?"
+        "⚠️ Esto es una emergencia. Detente y pide ayuda de inmediato: busca a tu brigadista de emergencias o avisa a tu jefe de área ahora mismo. Si puedes hacerlo con seguridad, dirígete a enfermería. No te quedes solo/a — pide a un compañero que se quede contigo."
     ],
     unknown: [
         "No estoy seguro de entender. ¿Podrías reformular tu pregunta sobre temas de RRHH?"
@@ -69,7 +69,7 @@ class IntentEngine {
         }
 
         // 4. Capacidades (Meta-preguntas)
-        if (/(que puedes hacer|que sabes|en que ayudas|para que sirves|para que sirve|ayuda|help|menu|opciones)/.test(normalized)) {
+        if (/(que puedes hacer|que sabes|en que ayudas|para que sirves|para que sirve|\bayuda\b|help|menu|opciones)/.test(normalized)) {
             return { type: 'capabilities', response: getRandomResponse('capabilities'), confidence: 1.0 };
         }
 
@@ -84,8 +84,12 @@ class IntentEngine {
             return { type: 'goodbye', response: getRandomResponse('goodbye'), confidence: 1.0 };
         }
 
-        // 7. Emergencia (Filtro de seguridad básico)
-        if (/(accidente|fuego|incendio|policia|ambulancia|robo|emergencia)/.test(normalized)) {
+        // 7. Emergencia — SOLO evento físico en curso (primera persona + lesión).
+        // Señal de lesión activa SIEMPRE tiene precedencia, incluso si la query
+        // también contiene palabras de procedimiento ("me corté, ¿con quién aviso?").
+        // Consultas de procedimiento SIN señal de lesión caen al RAG por fallback.
+        const esEmergenciaActiva = /(me\s+(cort[eo]|quem[eo]|ca[i]|golpe[eo]|lastim[eo]|intoxiqu[eo]|desmay[eo]|lesion[eo]|fractur[eo])|sangra|no\s+puedo\s+respirar|tengo\s+una\s+(herida|quemadura|lesion)|acabo\s+de\s+(tener|sufrir)(\s+un)?\s*(accidente|golpe|caida|lesion)|me\s+duele\s+mucho|fuego|incendio|ambulancia)/.test(normalized);
+        if (esEmergenciaActiva) {
             return { type: 'emergency', response: getRandomResponse('emergency'), confidence: 1.0 };
         }
 

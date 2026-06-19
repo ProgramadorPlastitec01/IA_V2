@@ -43,7 +43,15 @@ class PrivacyService {
     static classify(text, aiClassification = null) {
         if (!text || typeof text !== 'string') return CATEGORIES.MALICIOSA;
 
-        const lowerText = text.toLowerCase().trim();
+        // Normalizar antes del keyword check: quitar emojis y símbolos decorativos
+        // Unicode para que "🔥 salario 🤑" se evalúe igual que "salario".
+        const lowerText = text
+            .toLowerCase()
+            .replace(/[\u{1F300}-\u{1FFFF}]/gu, ' ')
+            .replace(/[\u{2600}-\u{26FF}]/gu, ' ')
+            .replace(/[\u{2700}-\u{27BF}]/gu, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
 
         // 1. Detección de Malicia (Heurística simple ante inyecciones o comandos)
         if (lowerText.includes('drop table') || lowerText.includes('delete from') || lowerText.includes('<script') || lowerText.startsWith('/')) {

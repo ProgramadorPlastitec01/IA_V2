@@ -40,11 +40,11 @@ const SystemStatus = () => {
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'active': return 'text-green-400 border-green-500/50 bg-green-500/10';
-            case 'degraded': return 'text-yellow-400 border-yellow-500/50 bg-yellow-500/10';
-            case 'inactive': return 'text-red-400 border-red-500/50 bg-red-500/10';
-            case 'checking': return 'text-blue-400 border-blue-500/50 bg-blue-500/10 animate-pulse';
-            default: return 'text-gray-400 border-gray-500/50 bg-gray-500/10';
+            case 'active': return 'text-cat-green border-cat-green/30 bg-cat-green-fill';
+            case 'degraded': return 'text-cat-amber border-cat-amber/30 bg-cat-amber-fill';
+            case 'inactive': return 'text-cat-coral border-cat-coral/30 bg-cat-coral-fill';
+            case 'checking': return 'text-brand border-brand/30 bg-brand-light animate-pulse';
+            default: return 'text-muted border-line bg-surface';
         }
     };
 
@@ -59,9 +59,9 @@ const SystemStatus = () => {
 
     if (error) {
         return (
-            <div className="p-8 text-center text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <div className="p-8 text-center text-cat-coral bg-cat-coral-fill border border-cat-coral/20 rounded-xl">
                 ⚠️ Error al verificar estado: {error}
-                <button onClick={checkStatus} className="block mx-auto mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-sm">
+                <button onClick={checkStatus} className="block mx-auto mt-4 px-4 py-2 bg-cat-coral-fill hover:bg-cat-coral hover:text-white border border-cat-coral/30 rounded-lg text-sm transition-colors">
                     Reintentar
                 </button>
             </div>
@@ -71,11 +71,11 @@ const SystemStatus = () => {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-white/80">Monitor de Servicios</h2>
+                <h2 className="text-xl font-medium text-ink">Monitor de Servicios</h2>
                 <button
                     onClick={checkStatus}
                     disabled={loading}
-                    className="px-3 py-1 text-xs bg-white/5 hover:bg-white/10 rounded border border-white/10 text-white/60 transition-colors disabled:opacity-50"
+                    className="px-3 py-1 text-xs bg-bg-panel hover:bg-surface rounded border border-line text-muted transition-colors disabled:opacity-50"
                 >
                     {loading ? 'Verificando...' : '🔄 Actualizar Ahora'}
                 </button>
@@ -90,15 +90,15 @@ const SystemStatus = () => {
                         className={`p-4 rounded-xl border flex flex-col justify-between h-32 ${getStatusColor(service.status)}`}
                     >
                         <div className="flex justify-between items-start">
-                            <span className="font-bold text-sm uppercase tracking-wider opacity-80">{service.name}</span>
+                            <span className="font-medium text-sm uppercase tracking-wider opacity-80">{service.name}</span>
                             <span className="text-xl">{getStatusIcon(service.status)}</span>
                         </div>
 
                         <div>
-                            <div className="text-2xl font-mono font-bold">
+                            <div className="text-2xl font-mono font-medium">
                                 {service.status === 'active' ? 'ONLINE' : service.status.toUpperCase()}
                             </div>
-                            <div className="flex justify-between items-end mt-2 text-[10px] opacity-60 font-mono">
+                            <div className="flex justify-between items-end mt-2 text-[10px] opacity-70 font-mono tabular-nums">
                                 <span>Latency: {service.latency}ms</span>
                                 {service.message && <span className="text-right max-w-[100px] truncate" title={service.message}>{service.message}</span>}
                             </div>
@@ -107,9 +107,9 @@ const SystemStatus = () => {
                 ))}
             </div>
 
-            <div className="mt-8 bg-black/20 rounded-lg p-4 border border-white/5">
-                <h3 className="text-xs text-white/40 uppercase mb-2">Logs de Sistema (Última hora)</h3>
-                <div className="font-mono text-[10px] text-white/30 space-y-1">
+            <div className="mt-8 bg-bg-panel rounded-lg p-4 border border-line">
+                <h3 className="text-xs text-muted uppercase mb-2">Logs de Sistema (Última hora)</h3>
+                <div className="font-mono text-[10px] text-muted space-y-1">
                     <div>[INF] System check initiated by admin user via web console.</div>
                     <div>[INF] Database integrity check passed (latency: {stats?.services[1]?.latency}ms).</div>
                     <div>[INF] Qdrant Vector DB heartbeat {stats?.services[2]?.status === 'active' ? 'successful' : 'failed'}.</div>

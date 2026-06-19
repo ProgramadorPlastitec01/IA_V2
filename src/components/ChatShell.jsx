@@ -47,6 +47,11 @@ const WELCOME = '¡Hola! 👋 Soy tu asistente de RRHH. Pregúntame sobre el Reg
 // Código conservado abajo (ver useEffect guardado) — no se borra.
 const CHAT_AUTOCLOSE_ENABLED = false;
 
+// Límite de longitud de consulta (espejo del MAX_QUERY_LENGTH del backend).
+// El contador discreto aparece a partir de COUNTER_THRESHOLD.
+const MAX_QUERY_LENGTH = 200;
+const COUNTER_THRESHOLD = 160;
+
 const MicIcon = () => (
     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" />
@@ -182,7 +187,11 @@ const ChatShell = () => {
     };
 
     // ── Consulta (texto o voz) ────────────────────────────────────────────
-    const handleQuery = async (queryText) => {
+    const handleQuery = async (rawQueryText) => {
+        // Truncado defensivo a 200 (cubre la entrada por VOZ, que puede sobrepasar
+        // el límite por dictado continuo). El input de texto ya está topado por
+        // maxLength. Preservamos el inicio: lo más relevante suele ir primero.
+        const queryText = (rawQueryText || '').slice(0, MAX_QUERY_LENGTH);
         if (!queryText || queryText.trim().length < 2) return;
         if (isLocked.current) { console.warn('[ChatShell] Query concurrente ignorada'); return; }
         isLocked.current = true;
@@ -484,14 +493,22 @@ const ChatShell = () => {
 
                     {/* Input */}
                     <div className="px-5 pt-3 pb-2 flex items-center gap-2 bg-bg-panel shrink-0">
-                        <input
-                            type="text" placeholder="Escribe tu pregunta..." autoComplete="off"
-                            value={inputValue}
-                            onChange={e => setInputValue(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitInput(); } }}
-                            disabled={appState === 'LISTENING' || appState === 'PROCESSING'}
-                            className="flex-1 px-3.5 py-2.5 border-[1.5px] border-line rounded-[10px] text-sm bg-surface text-ink outline-none transition-colors focus:border-brand focus:bg-bg-panel placeholder:text-muted disabled:opacity-50"
-                        />
+                        <div className="flex-1 relative">
+                            <input
+                                type="text" placeholder="Escribe tu pregunta..." autoComplete="off"
+                                value={inputValue}
+                                maxLength={MAX_QUERY_LENGTH}
+                                onChange={e => setInputValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitInput(); } }}
+                                disabled={appState === 'LISTENING' || appState === 'PROCESSING'}
+                                className="w-full px-3.5 py-2.5 border-[1.5px] border-line rounded-[10px] text-sm bg-surface text-ink outline-none transition-colors focus:border-brand focus:bg-bg-panel placeholder:text-muted disabled:opacity-50"
+                            />
+                            {inputValue.length >= COUNTER_THRESHOLD && (
+                                <span className="absolute right-3 bottom-[-16px] text-[10px] text-muted tabular-nums">
+                                    {inputValue.length}/{MAX_QUERY_LENGTH}
+                                </span>
+                            )}
+                        </div>
                         <button
                             onClick={submitInput}
                             disabled={appState === 'PROCESSING'}
