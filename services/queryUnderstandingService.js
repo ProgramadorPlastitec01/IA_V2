@@ -74,6 +74,12 @@ export const SPELL_VARIANTS = {
     'copast':              'COPASST',
     'copasst':             'COPASST',
     'copaset':             'COPASST',
+    'sagrilaf':            'SAGRILAFT',
+    'sagrilaft':           'SAGRILAFT',
+
+    // ── Buenas Prácticas de Manufactura (2026-08-13) ───────────────────
+    'manufctura':          'manufactura',
+    'manufatura':          'manufactura',
 };
 
 // Pre-calcular frases compuestas (claves con espacio) para búsqueda eficiente

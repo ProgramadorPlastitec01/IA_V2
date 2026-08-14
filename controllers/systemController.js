@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import DatabaseService from '../services/database.js';
+import qdrantService from '../services/qdrantService.js';
+import citationBuilder from '../services/citationBuilder.js';
 
 const LOG_FILE = path.join(process.cwd(), 'analytics.jsonl');
 const ERRORS_FILE = path.join(process.cwd(), 'errors.jsonl');
@@ -80,6 +82,25 @@ export const getSystemStatus = async (req, res) => {
     } catch (e) {}
 
     res.json(status);
+};
+
+/**
+ * Lista los documentos base del sistema, en su nombre humano legible
+ * (mismo mapeo que ya usa citationBuilder para las citas de respuestas),
+ * para mostrarlos en la vista pública y orientar qué se puede preguntar.
+ */
+export const getDocuments = async (req, res) => {
+    try {
+        const sources = await qdrantService.listDistinctSources();
+        const names = new Set();
+        sources.forEach(src => {
+            const name = citationBuilder._displayName(src);
+            if (name) names.add(name);
+        });
+        res.json({ documents: Array.from(names).sort((a, b) => a.localeCompare(b, 'es')) });
+    } catch (e) {
+        res.status(503).json({ documents: [], error: 'No se pudo consultar la base documental.' });
+    }
 };
 
 export const getKnowledgeVersion = async (req, res) => {

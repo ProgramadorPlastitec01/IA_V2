@@ -60,7 +60,9 @@ class DatabaseService {
                     last_validated       DATETIME DEFAULT CURRENT_TIMESTAMP,
                     usage_count          INTEGER DEFAULT 1,
                     last_used            DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    created_at           DATETIME DEFAULT CURRENT_TIMESTAMP
+                    created_at           DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    confidence           REAL    DEFAULT NULL,
+                    client_ip            TEXT    DEFAULT NULL
                 )
             `);
 
@@ -79,6 +81,14 @@ class DatabaseService {
             if (!colNames.includes('last_validated')) {
                 await this.db.exec(`ALTER TABLE knowledge_base ADD COLUMN last_validated DATETIME DEFAULT NULL`);
                 console.log('🔧 [DB Migration] Columna "last_validated" agregada');
+            }
+            if (!colNames.includes('confidence')) {
+                await this.db.exec(`ALTER TABLE knowledge_base ADD COLUMN confidence REAL DEFAULT NULL`);
+                console.log('🔧 [DB Migration] Columna "confidence" agregada');
+            }
+            if (!colNames.includes('client_ip')) {
+                await this.db.exec(`ALTER TABLE knowledge_base ADD COLUMN client_ip TEXT DEFAULT NULL`);
+                console.log('🔧 [DB Migration] Columna "client_ip" agregada');
             }
 
             // Índices
@@ -327,9 +337,11 @@ class DatabaseService {
      * @param {string} category
      * @param {string} source
      * @param {number} knowledgeVersion
+     * @param {number|null} confidence  Confianza del Retrieval Confidence Engine (0-1) para esta respuesta.
+     * @param {string|null} clientIp    IP del cliente que originó la consulta (req.ip).
      * @returns {Promise<'inserted'|'updated'|'skipped'>}
      */
-    async storeOrUpdate(questionOriginal, answer, category = 'general', source = 'gemma_rag', knowledgeVersion = 0) {
+    async storeOrUpdate(questionOriginal, answer, category = 'general', source = 'gemma_rag', knowledgeVersion = 0, confidence = null, clientIp = null) {
         if (!this.db) {
             console.warn('⚠️ [SQLite] DB no inicializada, no se puede guardar.');
             return 'skipped';
@@ -345,9 +357,9 @@ class DatabaseService {
         try {
             const insertResult = await this.db.run(
                 `INSERT OR IGNORE INTO knowledge_base
-                    (question_original, question_normalized, answer, category, source, knowledge_version, last_validated)
-                 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-                [questionOriginal, normalized, answer, category, source, knowledgeVersion]
+                    (question_original, question_normalized, answer, category, source, knowledge_version, last_validated, confidence, client_ip)
+                 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`,
+                [questionOriginal, normalized, answer, category, source, knowledgeVersion, confidence, clientIp]
             );
 
             if (insertResult.changes > 0) {
@@ -356,13 +368,15 @@ class DatabaseService {
                 return 'inserted';
             }
 
-            // Ya existía → actualizar uso y versión
+            // Ya existía → actualizar uso, versión, y última confianza/IP observadas
             await this.db.run(
                 `UPDATE knowledge_base
                  SET usage_count = usage_count + 1,
-                     last_used   = CURRENT_TIMESTAMP
+                     last_used   = CURRENT_TIMESTAMP,
+                     confidence  = COALESCE(?, confidence),
+                     client_ip   = COALESCE(?, client_ip)
                  WHERE question_normalized = ?`,
-                [normalized]
+                [confidence, clientIp, normalized]
             );
             console.log(`🔄 [SQLite] Entrada existente actualizada (uso++): "${questionOriginal.substring(0, 60)}"`);
             return 'updated';

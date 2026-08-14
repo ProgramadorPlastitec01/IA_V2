@@ -183,9 +183,9 @@ async function verifyCollection() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    const points   = data.result?.points_count   ?? 0;
-    const vectors  = data.result?.vectors_count  ?? 0;
-    const config   = data.result?.config?.params?.vectors;
+    const points = data.result?.points_count ?? 0;
+    const vectors = data.result?.vectors_count ?? 0;
+    const config = data.result?.config?.params?.vectors;
 
     console.log(`   Colección     : ${COLLECTION}`);
     console.log(`   Points count  : ${points}`);
@@ -238,9 +238,9 @@ async function runTestQuery(pointsCount) {
     // Mostrar resultados
     console.log('   ┌─────────────────────────────────────────────────────┐');
     results.forEach((r, i) => {
-      const score    = r.score?.toFixed(4) ?? 'N/A';
-      const fuente   = r.payload?.fuente || '(sin fuente)';
-      const texto    = (r.payload?.texto_original || '').substring(0, 160).replace(/\n/g, ' ');
+      const score = r.score?.toFixed(4) ?? 'N/A';
+      const fuente = r.payload?.fuente || '(sin fuente)';
+      const texto = (r.payload?.texto_original || '').substring(0, 160).replace(/\n/g, ' ');
       const relevant = r.score >= 0.80 ? '🟢' : r.score >= 0.55 ? '🟡' : '🔴';
       console.log(`   │ [${i + 1}] ${relevant} Score: ${score}  │  Fuente: ${fuente}`);
       console.log(`   │     "${texto}${texto.length >= 160 ? '...' : ''}"`);
@@ -249,7 +249,7 @@ async function runTestQuery(pointsCount) {
     console.log('   └─────────────────────────────────────────────────────┘');
 
     // Diagnóstico automático
-    const scores  = results.map(r => r.score ?? 0);
+    const scores = results.map(r => r.score ?? 0);
     const maxScore = Math.max(...scores);
     const avgScore = (scores.reduce((a, b) => a + b, 0) / scores.length);
 

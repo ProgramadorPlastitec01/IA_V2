@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import aiClient from '../utils/aiClient';
 import { API_BASE_URL } from '../utils/apiConfig';
@@ -6,6 +6,10 @@ import NexusCore from './NexusCore';
 import CompanyLogo from './CompanyLogo';
 import TypewriterText from './TypewriterText';
 import HelpGuide from './HelpGuide';
+import DocumentsGuide from './DocumentsGuide';
+
+// 5 minutos sin interacción → reinicio de conversación (kiosko compartido).
+const INACTIVITY_RESET_MS = 5 * 60 * 1000;
 
 /**
  * ChatShell — Fase 3 del rediseño.
@@ -17,27 +21,27 @@ import HelpGuide from './HelpGuide';
 
 // ── Categorías FAQ → color del diseño (vía CSS vars de @theme) ──────────────
 const CAT = {
-    teal:   { fill: 'var(--color-cat-teal-fill)',   color: 'var(--color-cat-teal)' },
-    coral:  { fill: 'var(--color-cat-coral-fill)',  color: 'var(--color-cat-coral)' },
-    amber:  { fill: 'var(--color-cat-amber-fill)',  color: 'var(--color-cat-amber)' },
-    green:  { fill: 'var(--color-cat-green-fill)',  color: 'var(--color-cat-green)' },
+    teal: { fill: 'var(--color-cat-teal-fill)', color: 'var(--color-cat-teal)' },
+    coral: { fill: 'var(--color-cat-coral-fill)', color: 'var(--color-cat-coral)' },
+    amber: { fill: 'var(--color-cat-amber-fill)', color: 'var(--color-cat-amber)' },
+    green: { fill: 'var(--color-cat-green-fill)', color: 'var(--color-cat-green)' },
     purple: { fill: 'var(--color-cat-purple-fill)', color: 'var(--color-cat-purple)' },
 };
 
 const ICONS = {
     calendar: <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />,
-    alert:    <><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
-    clock:    <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
-    phone:    <><rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></>,
+    alert: <><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
+    clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
+    phone: <><rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></>,
 };
 
 // ── FAQ (contenido DEFINITIVO; al tocar dispara handleQuery real) ───────────
 const FAQS = [
-    { theme: 'teal',   icon: 'calendar', cat: 'Vacaciones y licencias', q: '¿Cuántos días de permiso por luto tengo?', freq: 8 },
-    { theme: 'coral',  icon: 'alert',    cat: 'Accidentes',             q: '¿Cómo reporto un accidente laboral?',      freq: 6 },
-    { theme: 'amber',  icon: 'clock',    cat: 'Horarios',               q: '¿Cuál es el horario de trabajo?',          freq: 4 },
-    { theme: 'purple', icon: 'phone',    cat: 'Normas internas',        q: '¿Puedo usar mi celular en la planta?',     freq: 4 },
-    { theme: 'teal',   icon: 'calendar', cat: 'Vacaciones y licencias', q: '¿Cómo solicito vacaciones?',              freq: 2 },
+    { theme: 'teal', icon: 'calendar', cat: 'Vacaciones y licencias', q: '¿Cuántos días de permiso por luto tengo?', freq: 8 },
+    { theme: 'coral', icon: 'alert', cat: 'Accidentes', q: '¿Cómo reporto un accidente laboral?', freq: 6 },
+    { theme: 'amber', icon: 'clock', cat: 'Horarios', q: '¿Cuál es el horario de trabajo?', freq: 4 },
+    { theme: 'purple', icon: 'phone', cat: 'Normas internas', q: '¿Puedo usar mi celular en la planta?', freq: 4 },
+    { theme: 'teal', icon: 'calendar', cat: 'Vacaciones y licencias', q: '¿Cómo solicito vacaciones?', freq: 2 },
 ];
 
 // Mensaje de bienvenida (no hay store de config en el frontend; constante).
@@ -81,8 +85,14 @@ const ChatShell = () => {
     const [inputValue, setInputValue] = useState('');
     const [error, setError] = useState(null);
     const [isGuideOpen, setIsGuideOpen] = useState(false);
+    const [isDocsOpen, setIsDocsOpen] = useState(false);
     const [showPinModal, setShowPinModal] = useState(false);
     const [isSupported, setIsSupported] = useState(true);
+
+    // Reinicio de conversación (manual con confirmación + auto por inactividad)
+    const [confirmingReset, setConfirmingReset] = useState(false);
+    const confirmResetTimerRef = useRef(null);
+    const lastInteractionRef = useRef(Date.now());
 
     // Métricas en cliente (NO tocan aiClient) — arrancan en 0
     const [metrics, setMetrics] = useState({ consultas: 0, resueltas: 0 });
@@ -185,6 +195,68 @@ const ChatShell = () => {
             });
         } catch (e) { console.warn('No se pudo reportar error:', e.message); }
     };
+
+    // ── Reinicio de conversación ───────────────────────────────────────────
+    // Limpia la vista y el estado en memoria del cliente. No hace falta avisar
+    // al backend: cada pregunta ya quedó registrada en analytics.jsonl en el
+    // momento en que se hizo, el reset no pierde ningún dato de esa sesión.
+    // Este chat no persiste historial en localStorage (vive solo en React
+    // state), así que no hay nada más que limpiar del lado del navegador.
+    const handleFullReset = useCallback(() => {
+        if (synthRef.current) synthRef.current.cancel();
+        if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch { /* noop */ } }
+        if (abortControllerRef.current) abortControllerRef.current.abort();
+        aiClient.resetConversation();
+        isLocked.current = false;
+        setConfirmingReset(false);
+        setError(null);
+        setInputValue('');
+        setProcessingStep(0);
+        setAppState('IDLE');
+        setMetrics({ consultas: 0, resueltas: 0 });
+        setMessages([{ id: newId(), role: 'bot', text: WELCOME }]);
+    }, []);
+
+    // Doble-tap para confirmar (evita que un toque accidental sobre el botón
+    // público borre una conversación activa).
+    const handleResetClick = () => {
+        if (confirmingReset) {
+            clearTimeout(confirmResetTimerRef.current);
+            handleFullReset();
+            return;
+        }
+        setConfirmingReset(true);
+        confirmResetTimerRef.current = setTimeout(() => setConfirmingReset(false), 3000);
+    };
+
+    // Auto-reinicio tras 5 minutos sin interacción: la siguiente persona en el
+    // kiosko empieza de cero, sin quedar expuesta la conversación anterior.
+    useEffect(() => {
+        const markInteraction = () => { lastInteractionRef.current = Date.now(); };
+        window.addEventListener('mousemove', markInteraction);
+        window.addEventListener('touchstart', markInteraction);
+        window.addEventListener('keydown', markInteraction);
+        return () => {
+            window.removeEventListener('mousemove', markInteraction);
+            window.removeEventListener('touchstart', markInteraction);
+            window.removeEventListener('keydown', markInteraction);
+        };
+    }, []);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            // Solo un mensaje (el de bienvenida) y sin actividad → ya está "en reposo".
+            if (messages.length <= 1) return;
+            if (Date.now() - lastInteractionRef.current >= INACTIVITY_RESET_MS) {
+                handleFullReset();
+            }
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [handleFullReset, messages.length]);
+
+    useEffect(() => {
+        return () => clearTimeout(confirmResetTimerRef.current);
+    }, []);
 
     // ── Consulta (texto o voz) ────────────────────────────────────────────
     const handleQuery = async (rawQueryText) => {
@@ -375,7 +447,7 @@ const ChatShell = () => {
     // ── Sub-estado en la burbuja en progreso ──────────────────────────────
     const subStateText = processingStep === 1 ? 'Recibiendo solicitud…'
         : processingStep === 2 ? 'Analizando información…'
-        : processingStep === 3 ? 'Generando respuesta…' : 'Procesando…';
+            : processingStep === 3 ? 'Generando respuesta…' : 'Procesando…';
 
     const pendientes = Math.max(0, metrics.consultas - metrics.resueltas);
 
@@ -399,12 +471,32 @@ const ChatShell = () => {
                         </div>
                     </div>
                 </div>
-                <button
-                    onClick={() => setIsGuideOpen(true)}
-                    className="flex items-center gap-2 px-3.5 h-9 bg-surface border border-line rounded-lg text-[13px] font-medium text-ink hover:bg-brand-light hover:border-brand hover:text-brand transition-colors"
-                >
-                    <span>💡</span><span className="hidden sm:inline">¿Cómo preguntar?</span>
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setIsDocsOpen(true)}
+                        title="¿Qué documentos conozco?"
+                        className="flex items-center gap-2 px-3.5 h-9 bg-surface border border-line rounded-lg text-[13px] font-medium text-ink hover:bg-brand-light hover:border-brand hover:text-brand transition-colors"
+                    >
+                        <span>📄</span><span className="hidden sm:inline">Documentos</span>
+                    </button>
+                    <button
+                        onClick={() => setIsGuideOpen(true)}
+                        className="flex items-center gap-2 px-3.5 h-9 bg-surface border border-line rounded-lg text-[13px] font-medium text-ink hover:bg-brand-light hover:border-brand hover:text-brand transition-colors"
+                    >
+                        <span>💡</span><span className="hidden sm:inline">¿Cómo preguntar?</span>
+                    </button>
+                    <button
+                        onClick={handleResetClick}
+                        title="Reiniciar conversación"
+                        className={`flex items-center gap-2 px-3.5 h-9 rounded-lg text-[13px] font-medium transition-colors border ${confirmingReset
+                            ? 'text-white border-transparent'
+                            : 'bg-surface border-line text-ink hover:bg-brand-light hover:border-brand hover:text-brand'
+                            }`}
+                        style={confirmingReset ? { background: 'var(--color-cat-coral)' } : undefined}
+                    >
+                        <span>🔄</span><span className="hidden sm:inline">{confirmingReset ? '¿Seguro?' : 'Reiniciar'}</span>
+                    </button>
+                </div>
             </motion.header>
 
             {/* ── CUERPO: 2 paneles ──────────────────────────────────── */}
@@ -416,7 +508,7 @@ const ChatShell = () => {
                     className="w-[56%] flex flex-col bg-bg-panel border-r border-line max-[880px]:w-full max-[880px]:h-[58vh] max-[880px]:border-r-0 max-[880px]:border-b"
                 >
                     <div className="px-5 py-3 border-b border-line shrink-0">
-                        <h2 className="text-[13px] font-medium text-muted uppercase tracking-wider">Conversación</h2>
+                        <h2 className="text-[13px] font-medium text-muted uppercase tracking-wider">Asistente</h2>
                     </div>
 
                     {/* Mensajes */}
@@ -520,8 +612,8 @@ const ChatShell = () => {
 
                     {/* Disclaimer FIJO, persistente en todos los estados (item 18) */}
                     <div className="px-5 pb-2 shrink-0">
-                        <p className="text-[11px] text-muted text-center">
-                            Asistente IA RRHH puede cometer errores. Por favor, verificar las respuestas.
+                        <p className="text-[11px] text-black text-center">
+                            📌 Asistente IA RRHH puede cometer errores. Por favor, verificar las respuestas. 📌
                         </p>
                     </div>
                 </motion.section>
@@ -534,8 +626,8 @@ const ChatShell = () => {
                     <div className="grid grid-cols-3 gap-3">
                         {[
                             { label: 'Consultas hoy', value: metrics.consultas, dot: 'var(--color-brand-light)' },
-                            { label: 'Resueltas',     value: metrics.resueltas, dot: 'var(--color-cat-teal-fill)' },
-                            { label: 'Pendientes',    value: pendientes,        dot: 'var(--color-cat-amber-fill)' },
+                            { label: 'Resueltas', value: metrics.resueltas, dot: 'var(--color-cat-teal-fill)' },
+                            { label: 'Pendientes', value: pendientes, dot: 'var(--color-cat-amber-fill)' },
                         ].map((m, i) => (
                             <div key={i} className="bg-bg-panel border border-line rounded-xl p-4 flex flex-col gap-1">
                                 <span className="text-[11px] font-medium text-muted uppercase tracking-wider">{m.label}</span>
@@ -579,6 +671,13 @@ const ChatShell = () => {
                         })}
                     </div>
                 </motion.aside>
+            </div>
+
+            {/* ── Footer global: aviso de fase de pruebas ────────────── */}
+            <div className="shrink-0 px-6 py-2 border-t border-line text-center" style={{ background: '#ffe9d3' }}>
+                <p className="text-[11px]" style={{ color: '#7a4a1e' }}>
+                    🧪 Este asistente se encuentra en <span className="font-medium">fase de pruebas</span>. Tu retroalimentación nos ayuda a mejorarlo.
+                </p>
             </div>
 
             {/* ── Toast de error (re-skin claro) ─────────────────────── */}
@@ -629,6 +728,11 @@ const ChatShell = () => {
             {/* Guía de uso */}
             <AnimatePresence>
                 {isGuideOpen && <HelpGuide isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />}
+            </AnimatePresence>
+
+            {/* Documentos base */}
+            <AnimatePresence>
+                {isDocsOpen && <DocumentsGuide isOpen={isDocsOpen} onClose={() => setIsDocsOpen(false)} />}
             </AnimatePresence>
         </div>
     );

@@ -31,6 +31,64 @@ import retrievalConfidence from './retrievalConfidence.js';
 import { cleanResponse, polarityAwareClean } from '../utils/textProcessor.js';
 import responseTypeResolver from './responseTypeResolver.js';
 import responseBuilderService from './responseBuilderService.js';
+import { SYSTEM_MESSAGES } from '../config/systemMessages.js';
+
+// ─── Vocabulario conocido para detección de gibberish ─────────────────────
+// Palabras HR/español que indican que la query tiene sentido.
+// Construido de: DOC_PRIORITY_MAP keywords (más abajo) + léxico HR frecuente.
+// Las entradas con tilde y sin tilde coexisten para cubrir escritura informal.
+const KNOWN_VOCAB_EXTRA = new Set([
+    // Trabajo / empleado
+    'trabajo', 'trabajar', 'trabajador', 'trabajadores', 'empleado', 'empleados',
+    'empresa', 'laboral', 'laborales', 'cargo', 'puesto', 'jefe', 'supervisor',
+    // Documentos / normas
+    'reglamento', 'norma', 'normas', 'regla', 'reglas', 'politica', 'política',
+    'procedimiento', 'instructivo', 'manual', 'ley', 'articulo', 'artículo',
+    // Jornada / tiempo
+    'jornada', 'horario', 'turno', 'turnos', 'hora', 'horas', 'semana', 'dia', 'día',
+    'descanso', 'vacaciones', 'permiso', 'licencia', 'ausencia', 'falta',
+    // Pago / nómina
+    'salario', 'sueldo', 'pago', 'nomina', 'nómina', 'quincena', 'subsidio',
+    'auxilio', 'prestacion', 'prestación', 'prestaciones', 'cesantias', 'cesantías',
+    'beneficio', 'beneficios', 'extralegal', 'extralegales',
+    // Dotación / uniforme
+    'uniforme', 'uniformes', 'dotacion', 'dotación', 'ropa', 'calzado', 'zapatos',
+    'guante', 'guantes', 'casco', 'cofia', 'overol', 'polainas', 'escafandra',
+    // Higiene / BPM
+    'higiene', 'lavado', 'sanitizacion', 'sanitización', 'inocuidad', 'manufactura',
+    'planta', 'produccion', 'producción', 'area', 'área', 'zona', 'comedor',
+    // SST / seguridad
+    'accidente', 'incidente', 'riesgo', 'riesgos', 'emergencia', 'seguridad', 'salud',
+    'epp', 'proteccion', 'protección', 'peligro', 'incapacidad', 'incapacidades',
+    // RRHH / procesos
+    'contrato', 'despido', 'renuncia', 'queja', 'reclamo', 'capacitacion', 'capacitación',
+    'induccion', 'inducción', 'evaluacion', 'evaluación', 'sancion', 'sanción',
+    'disciplinario', 'amonestacion', 'amonestación', 'suspension', 'suspensión',
+    // Objetos / comportamiento (queries de política de uso)
+    'celular', 'telefono', 'teléfono', 'camara', 'cámara', 'reloj', 'audifono', 'audífono',
+    'fumar', 'tabaco', 'cigarrillo', 'alcohol', 'bebida', 'comer', 'alimentos',
+    // Higiene corporal (evitar falso positivo de gibberish)
+    'defecar', 'orinar', 'sanitario', 'bano', 'baño', 'lavamanos',
+    // Conectividad / teletrabajo
+    'teletrabajo', 'remoto', 'casa', 'virtual', 'digital', 'desconexion', 'desconexión',
+    // Valores / ética
+    'etica', 'ética', 'etico', 'ético', 'integridad', 'conducta', 'denuncia',
+    'corrupcion', 'corrupción', 'soborno', 'transparencia',
+    // Preguntas con sustantivo válido
+    'cuantas', 'cuántas', 'cuantos', 'cuántos', 'aplica', 'aplican', 'permite', 'pueden',
+    // Glosario RIT 2026 (2026-08-14) — vocabulario/sinónimos entregados por el
+    // usuario a partir del propio RIT. Cierra gaps de gate confirmados: sin
+    // estos términos, preguntas legítimas sobre contratación, disciplina o
+    // confidencialidad caían en "No encontré información" pese a existir en
+    // el RIT (mismo patrón de bug que período de prueba/aspirantes).
+    'prorroga', 'prórroga', 'jornal', 'estipendio', 'remuneracion', 'remuneración',
+    'postulante', 'candidato', 'candidatos',
+    'calamidad', 'domestica', 'doméstica',
+    'descargo', 'descargos', 'proceso disciplinario',
+    'confidencialidad', 'reserva', 'discrecion', 'discreción', 'sigilo',
+    'indumentaria', 'infraccion', 'infracción', 'penalidad',
+    'justificaciones', 'dispensa',
+]);
 
 // ─── Constantes de dominio ─────────────────────────────────────────────────
 
@@ -53,7 +111,8 @@ const DOC_PRIORITY_MAP = [
         penalizeDocs: ['rit', 'reglamento', 'comunicado'],
     },
     {
-        keywords:     ['aprendiz', 'sena', 'contrato aprendizaje', 'contrato de aprendizaje'],
+        keywords:     ['aprendiz', 'sena', 'contrato aprendizaje', 'contrato de aprendizaje',
+                       'pasantia', 'pasantía', 'practicante', 'pasante'],
         boostDocs:    ['rit', 'reglamento'],
         penalizeDocs: ['bpm'],
     },
@@ -126,6 +185,44 @@ const DOC_PRIORITY_MAP = [
         boostDocs:    ['rit', 'reglamento'],
         penalizeDocs: ['induccion', 'i-rh-004'],
     },
+    // ── Debido Proceso / Descargos (2026-08-14) ───────────────────────────────
+    // Diligencia de descargos previa a sanción disciplinaria (citación con
+    // antelación mínima, derecho a defensa/pruebas/acompañamiento sindical).
+    // Sin regla, "descargos"/"debido proceso" comparte vocabulario genérico
+    // con "sanción"/"disciplinario" y puede atraer chunks de faltas/escala
+    // sancionatoria en vez del procedimiento de citación en sí.
+    {
+        keywords:     [
+            'descargo', 'descargos', 'debido proceso', 'citacion a descargos',
+            'citación a descargos', 'derecho de defensa', 'presentar descargos',
+            'diligencia de descargos',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: ['induccion', 'bpm'],
+    },
+    // ── Calamidad Doméstica (2026-08-14) ──────────────────────────────────────
+    {
+        keywords:     [
+            'calamidad domestica', 'calamidad doméstica', 'permiso por calamidad',
+            'licencia por calamidad',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: ['induccion', 'bpm'],
+    },
+    // ── Tipos de Contrato (2026-08-14) ────────────────────────────────────────
+    // Distingue de queries genéricas de "contrato" (palabra muy frecuente en
+    // todo el corpus) cuando la pregunta apunta a la clasificación misma.
+    {
+        keywords:     [
+            'contrato a termino fijo', 'contrato a término fijo',
+            'contrato a termino indefinido', 'contrato a término indefinido',
+            'contrato por obra o labor', 'contrato de obra o labor',
+            'tipos de contrato', 'clases de contrato', 'prorroga del contrato',
+            'prórroga del contrato',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: ['induccion', 'bpm'],
+    },
     // ── Quejas y reclamos (2026-06-15) ───────────────────────────────────────
     // El trámite de reclamos está en el RIT (Cap. XXIV, Art. 110-111). Refuerza
     // el ranking además de la expansión sinonímica del vocabulario.
@@ -133,6 +230,118 @@ const DOC_PRIORITY_MAP = [
         keywords:     [
             'quejas y reclamos', 'queja', 'reclamo', 'reclamos',
             'procedimiento de reclamo', 'tramite de reclamo', 'trámite de reclamo',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: ['induccion', 'bpm'],
+    },
+    // ── Jornada laboral / horarios / horas extras (2026-07-09) ───────────────
+    // El CAPITULO VII del RIT (Art. 23-28) regula horarios; CAPITULO VIII (Art.
+    // 29-33) regula horas extras. Sin esta regla, queries de "horas laborales"
+    // o "turno" atraen chunks de SST/BPM que hablan de "turnos de riesgo".
+    {
+        keywords:     [
+            'jornada', 'jornada laboral', 'jornada de trabajo',
+            'horario', 'horario de trabajo', 'horario laboral',
+            'horas laborales', 'horas de trabajo', 'horas semanales',
+            'turno', 'turnos', 'trabajo por turnos', 'turno de trabajo',
+            'hora extra', 'horas extras', 'trabajo suplementario', 'trabajo nocturno',
+            'recargo nocturno', 'jornada maxima', 'jornada máxima',
+            'descanso remunerado', 'jornada flexible',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: ['induccion', 'i-rh-004', 'bpm'],
+    },
+    // ── Alcohol / Embriaguez / Sustancias Psicoactivas (2026-08-03) ──────────
+    // Contenido disperso en 4 documentos (RIT Art. 81.2 + faltas graves 14/40,
+    // I-RH-004 política SST, I-RH-017 código de ética punto 10, BPM higiene).
+    // Sin regla, la consulta llega al reranking sin ningún boost léxico/documental
+    // (ver diagnostico_rag.md sección 4-5: confidence_score 0.0000 → Fast Reject).
+    {
+        keywords:     [
+            'embriaguez', 'embriagado', 'embriagada', 'borracho', 'borracha',
+            'tomado', 'tomada', 'ebrio', 'ebria', 'alicorado', 'alicorada',
+            'trago', 'tragos', 'licor', 'drogado', 'drogada', 'colgado', 'colgada',
+            'alcohol', 'sustancias psicoactivas', 'sustancias sicoactivas',
+            'sustancia psicoactiva', 'ingesta de alcohol',
+        ],
+        boostDocs:    ['rit', 'reglamento', 'i-rh-004', 'i-rh-017', 'i-rh-003', 'bpm'],
+        penalizeDocs: [],
+    },
+    // ── Acoso Laboral / Acoso Sexual (2026-08-03) ─────────────────────────────
+    // Cap. XXIX-XXXI del RIT. Dominio altamente sensible/disciplinario sin
+    // ninguna cobertura previa en vocabulario, frases de dominio ni prioridad
+    // documental — mismo patrón de gap que alcohol/embriaguez.
+    {
+        keywords:     [
+            'acoso laboral', 'acoso sexual', 'hostigamiento', 'maltrato laboral',
+            'bullying', 'me acosan', 'me está acosando', 'me tocó sin permiso',
+            'chantaje sexual', 'comité de convivencia', 'persecución laboral',
+            'discriminación laboral', 'favores sexuales', 'insinuaciones',
+            'mi jefe me maltrata', 'me humillan', 'me hostigan',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: ['induccion', 'bpm'],
+    },
+    // ── Período de Prueba / Selección y Admisión de Personal (2026-08-14) ────
+    // Gap confirmado por pruebas NotebookLM: ambos temas existen en el RIT
+    // (Cap. IV período de prueba; Art. 2 Parágrafo 1 prohibiciones de admisión)
+    // con retrieval score 0.72-0.77 en Qdrant, pero ningún token de la query
+    // ("período de prueba", "aspirantes", "selección") estaba en el vocabulario
+    // curado → hasTopicalSignal=false → SYSTEM_MESSAGES.NO_MATCH antes del LLM.
+    {
+        keywords:     [
+            'periodo de prueba', 'período de prueba', 'periodo de prueba laboral',
+            'duracion del periodo de prueba', 'duración del período de prueba',
+            'aspirante', 'aspirantes', 'proceso de seleccion', 'proceso de selección',
+            'seleccion de personal', 'selección de personal',
+            'admision de personal', 'admisión de personal', 'proceso de admision',
+            'proceso de admisión', 'requisitos de ingreso', 'requisitos de vinculacion',
+            'requisitos de vinculación', 'vinculacion laboral', 'vinculación laboral',
+            'prohibido exigir', 'prueba de embarazo', 'examen de sida',
+            'libreta militar',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: ['induccion', 'bpm'],
+    },
+    // ── Terminación con Justa Causa / Despido (2026-08-03) ────────────────────
+    {
+        keywords:     [
+            'despido', 'me despiden', 'me pueden despedir', 'echar del trabajo',
+            'terminación con justa causa', 'justa causa', 'terminar mi contrato',
+            'causales de terminación', 'me pueden echar',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: [],
+    },
+    // ── Teletrabajo / Trabajo Remoto / Trabajo en Casa (2026-08-03) ───────────
+    {
+        keywords:     [
+            'teletrabajo', 'teletrabajador', 'trabajo en casa', 'trabajo remoto',
+            'home office', 'trabajar desde la casa', 'trabajar virtual desde casa',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: ['induccion', 'bpm'],
+    },
+    // ── Dotación Laboral (prestación económica — Art. 58 RIT) (2026-08-03) ────
+    // Distinto del uniforme/higiene de BPM (regla 1): aquí la consulta es sobre
+    // la PRESTACIÓN (frecuencia, derecho, fechas de entrega), no el uso en planta.
+    {
+        keywords:     [
+            'dotación laboral', 'cada cuanto dan dotacion', 'cada cuánto dan dotación',
+            'derecho a dotacion', 'derecho a dotación', 'entrega de dotacion',
+            'entrega de dotación', 'cuantas dotaciones al año', 'tres dotaciones al año',
+            'suministro de dotación',
+        ],
+        boostDocs:    ['rit', 'reglamento'],
+        penalizeDocs: [],
+    },
+    // ── Uso de Tecnología / Redes Sociales (2026-08-03) ───────────────────────
+    {
+        keywords:     [
+            'redes sociales', 'whatsapp del trabajo', 'whatsapp corporativo',
+            'me revisan el correo', 'revisan mi computador', 'monitoreo de herramientas',
+            'publicar en facebook', 'hablar mal de la empresa en redes',
+            'facebook', 'instagram', 'hablar mal de la empresa',
         ],
         boostDocs:    ['rit', 'reglamento'],
         penalizeDocs: ['induccion', 'bpm'],
@@ -240,7 +449,7 @@ class RagService {
             );
 
             // Reranking léxico multi-factor
-            const lexicalReranked = rerankingService.rerank(merged, spellCorrectedQuery, keywords, docPriority, foundAcronyms);
+            const lexicalReranked = rerankingService.rerank(merged, spellCorrectedQuery, keywords, docPriority, foundAcronyms, expanded_terms);
 
             // ── Fase 2.5.1: Neural Reranking (Cross-Encoder) ──────────────
             // Sólo activo si ENABLE_NEURAL_RERANKER=true — producción no afectada
@@ -258,6 +467,38 @@ class RagService {
 
             metrics.rerank_ms = Date.now() - startRerank;
 
+            // ── Garantía de supervivencia semántica ──────────────────────────
+            // Los top-2 del retrieval semántico puro deben quedar siempre
+            // dentro del top-6 final. Si el reranking léxico los desplazó
+            // (p.ej. phrase-boost en chunks genéricos), los reinsertamos al
+            // final del top-6 reemplazando el slot menos relevante.
+            //
+            // BUG CORREGIDO (2026-08-14): el slot reemplazado se elegía por
+            // posición fija (6 - rescued.length), sin mirar SI ese slot ya lo
+            // ocupaba un chunk con domainBoost fuerte (Ética/SAGRILAFT/Admisión,
+            // rerankingService._domainSpecificBoost). Caso confirmado: la query
+            // de "aspirantes/selección" hacía que este rescate expulsara del
+            // top-6 justo al chunk boosteado a propósito (Art. 2 RIT, +0.45),
+            // reinsertando en su lugar un resultado semántico genérico — la
+            // regla de dominio quedaba anulada por este rescate. Fix: al elegir
+            // qué slot sacrificar, saltar los que tengan domainBoost > 0.
+            {
+                const top6Ids  = new Set(reranked.slice(0, 6).map(r => r.id));
+                const displaced = semanticResults.slice(0, 2).filter(r => !top6Ids.has(r.id));
+                if (displaced.length > 0) {
+                    const displacedIds = new Set(displaced.map(r => r.id));
+                    const rescued  = reranked.filter(r => displacedIds.has(r.id));
+                    const rest     = reranked.filter(r => !displacedIds.has(r.id));
+                    let evictFrom  = Math.max(0, 6 - rescued.length);
+                    while (evictFrom < rest.length && parseFloat(rest[evictFrom]?.scoreDetail?.domain || 0) > 0) {
+                        evictFrom++;
+                    }
+                    rest.splice(evictFrom, rescued.length, ...rescued);
+                    reranked = rest;
+                    console.log(`[SemanticSurvival] ${displaced.length} chunk(s) rescatados → posiciones ${evictFrom + 1}–${evictFrom + rescued.length}`);
+                }
+            }
+
             ragLogger.logReranking(session, {
                 rankedChunks:  reranked,
                 fusion_results: merged.length,
@@ -268,17 +509,23 @@ class RagService {
 
             // ── ETAPA 5: Construcción de contexto & Retrieval Confidence ──
             const startContext = Date.now();
-            const { contextText, chunksUsed, sources, rawConfidence, logDetails } =
-                await this._buildContextExpanded(reranked, query, keywords);
+            const { contextText, chunksUsed, sources, rawConfidence, bestKeywordScore, bestHasSectionRelevance, logDetails } =
+                await this._buildContextExpanded(reranked, query, keywords, expanded_terms);
             const contextMs = Date.now() - startContext;
 
             // Retrieval Confidence Engine (V2 — Query Specificity Score activo)
+            // 2026-08-03: similarity/keywordDensity/hasSectionRelevance ahora vienen
+            // del "best chunk" entre los que REALMENTE entraron al contexto
+            // (ver _buildContextExpanded), no ciegamente de reranked[0]. Antes, un
+            // DocBoost plano podía empatar varios chunks y dejar el relevante en
+            // una posición != 0, subestimando confidence aunque el contenido
+            // correcto sí estuviera en contextText (Fast Reject injusto).
             const { confidence, querySpecificityTokens } = retrievalConfidence.calculateConfidence({
                 similarity: rawConfidence,
-                keywordDensity: reranked.length > 0 ? (reranked[0].keywordScore || 0) : 0,
+                keywordDensity: bestKeywordScore || 0,
                 hasPhraseMatch: exactPhraseResults.length > 0,
                 hasAcronymMatch: foundAcronyms.length > 0,
-                hasSectionRelevance: reranked.length > 0 ? (reranked[0].boostReason?.includes('section') || false) : false,
+                hasSectionRelevance: bestHasSectionRelevance || false,
                 query,
             });
 
@@ -316,9 +563,38 @@ class RagService {
             const safeConfidence = isNaN(confidence) ? 0 : confidence;
             console.log(`[ConfidenceEngine] similarity=${rawConfidence.toFixed(3)} specificityTokens=${querySpecificityTokens} finalConfidence=${safeConfidence.toFixed(3)}`);
 
-            if (!contextText || chunksUsed === 0 || safeConfidence < 0.20 || isEntityHallucination) {
+            // ── Relevancia Temática Mínima (2026-08-03 — fix de seguridad) ────
+            // BUG DE SEGURIDAD CONFIRMADO (seguimiento_3.md #1): preguntas
+            // completamente fuera de dominio ("¿Cuál es la capital de Francia?",
+            // "¿Cuánto es 2+2?") cruzaban el gate de confianza 0.20 y el LLM
+            // alucinaba respuestas citando fuentes RIT/SST de forma espuria.
+            // Causa: el Domain Referent Rule de retrievalConfidence.js exige solo
+            // "algún sustantivo específico", sin verificar que ese sustantivo
+            // pertenezca al dominio de Plastitec — palabras genéricas muy
+            // frecuentes en el corpus ("más", "trabajo") inflan BM25/keywordDensity
+            // sin relevancia temática real.
+            // Fix: exigir que la query dispare AL MENOS UNA señal real de que
+            // toca el dominio HR/Plastitec — expansión de vocabulario corporativo,
+            // acrónimo detectado, regla de DOC_PRIORITY_MAP, o un token léxico
+            // presente en el vocabulario HR curado (KNOWN_VOCAB_EXTRA/DOC_PRIORITY_MAP,
+            // NO el vocabulario genérico de _isGibberishQuery que incluye stopwords).
+            // Es un guardrail ADICIONAL (solo puede rechazar más, nunca aceptar
+            // algo que antes se rechazaba) — no toca retrieval/reranking/confidence.
+            // BUG (2026-08-13): este gate compara contra el vocabulario canónico HR,
+            // así que debe usar spellCorrectedQuery — igual que embedding/keywords/
+            // reranking (ver comentario en la construcción de spellCorrectedQuery
+            // más arriba). Usar `query` (raw) hacía que un typo de dominio real
+            // ("lisencia", "acidentes lavorales") nunca matcheara el vocabulario
+            // aunque la corrección ortográfica ya lo hubiera arreglado para el
+            // resto del pipeline, rechazando la pregunta antes del retrieval.
+            const hasTopicalSignal = expanded_terms.length > 0
+                || foundAcronyms.length > 0
+                || docPriority.boost.length > 0
+                || this._hasHRDomainToken(spellCorrectedQuery);
+
+            if (!contextText || chunksUsed === 0 || safeConfidence < 0.20 || isEntityHallucination || !hasTopicalSignal) {
                 const noContextResp = {
-                    answer:      'No encontré información sobre este tema en la documentación disponible.',
+                    answer:      SYSTEM_MESSAGES.NO_MATCH,
                     confidence:  0,
                     sources:     [],
                     metrics,
@@ -333,6 +609,32 @@ class RagService {
                 });
                 metrics.total_ms = Date.now() - startTotal;
                 return { ...noContextResp, metrics };
+            }
+
+            // ── Guardrail pre-LLM ─────────────────────────────────────────
+            // Dos condiciones que indican que invocar el LLM producirá alucinación:
+            // 1. Gibberish: ningún token de la query original está en el vocabulario.
+            // 2. Señal débil: el 2º candidato rerankeado tiene score 0 y el top < 0.5.
+            // Mismo fix que hasTopicalSignal arriba: comparar contra vocabulario
+            // canónico requiere la query ya corregida ortográficamente.
+            const isGibberish = this._isGibberishQuery(spellCorrectedQuery);
+            const hasWeakRetrieval = reranked.length >= 2
+                && (reranked[1].finalScore ?? 0) === 0
+                && (reranked[0].finalScore ?? 0) < 0.50;
+
+            if (isGibberish || hasWeakRetrieval) {
+                const guardrailReason = isGibberish ? 'gibberish_query' : 'weak_retrieval';
+                console.log(`[Guardrail] Interceptado pre-LLM: ${guardrailReason} | query="${query}"`);
+                const reformMsg = SYSTEM_MESSAGES.NOT_UNDERSTOOD;
+                ragLogger.logResponse(session, {
+                    rawResponse:     reformMsg,
+                    finalResponse:   reformMsg,
+                    llmMs:           0,
+                    modelUsed:       'N/A (guardrail)',
+                    confidenceAware: false,
+                });
+                metrics.total_ms = Date.now() - startTotal;
+                return { answer: reformMsg, confidence: 0, sources: [], metrics, chunksUsed: 0 };
             }
 
             // ── ETAPA 6 & 7: Pipeline de Extracción Multi-Etapa (Fase 2) ──
@@ -466,7 +768,7 @@ class RagService {
 
     // ─── Construcción de contexto con neighbor retrieval ─────────────────
 
-    async _buildContextExpanded(results, query, keywords) {
+    async _buildContextExpanded(results, query, keywords, expandedTerms = []) {
         const MAX_CONTEXT_CHARS = 10000;
         const topScore = results.length > 0 ? results[0].finalScore : 0;
         const minThreshold = Math.max(0.20, topScore * 0.15);
@@ -554,13 +856,19 @@ class RagService {
         criticalChunks.forEach(c => addChunkToContext(c.payload.fuente, c.payload.texto_original, true));
 
         // 2. Agregar Vecinos de Críticos (si hay espacio)
+        // BUG CORREGIDO (2026-08-14): `break` cortaba el ensamblaje entero apenas
+        // un chunk no cabía, descartando también a los que venían después en la
+        // lista aunque fueran más pequeños y sí cupieran — un chunk voluminoso de
+        // baja prioridad podía así bloquear a uno relevante (boosteado a propósito
+        // por domainBoost) que llegaba más tarde en el orden. `continue` prueba
+        // todos los candidatos restantes contra el presupuesto disponible.
         for (const p of neighborPayloads) {
-            if (!addChunkToContext(p.fuente, p.texto_original, false)) break;
+            addChunkToContext(p.fuente, p.texto_original, false);
         }
 
-        // 3. Agregar Chunks de Soporte (si hay espacio)
+        // 3. Agregar Chunks de Soporte (si hay espacio) — ver mismo fix arriba.
         for (const c of supportChunks) {
-            if (!addChunkToContext(c.payload.fuente, c.payload.texto_original, false)) break;
+            addChunkToContext(c.payload.fuente, c.payload.texto_original, false);
         }
 
         let finalContextText = '';
@@ -570,13 +878,195 @@ class RagService {
             finalContextText += '\n' + '─'.repeat(50) + '\n';
         }
 
+        // ── Best Chunk (2026-08-03) ───────────────────────────────────────────
+        // BUG CORREGIDO: el Confidence Engine usaba SIEMPRE `results[0]` (posición 0
+        // tras la fusión/reranking) para similarity/keywordDensity/hasSectionRelevance,
+        // incluso cuando el chunk realmente relevante entraba al contexto en otra
+        // posición (p.ej. empatado en score por un DocBoost plano de DOC_PRIORITY_MAP).
+        // Esto subestimaba `confidence_score` y producía Fast Rejects (< 0.20)
+        // aunque el contenido correcto SÍ estuviera en `contextText`.
+        // Fix: elegir, entre los chunks que REALMENTE entraron al contexto
+        // (criticalChunks + supportChunks), el de mayor finalScore — con
+        // keywordScore como primer desempate y cantidad de canales de búsqueda
+        // corroborantes (searchType, ej. "bm25+expanded_semantic") como segundo
+        // desempate — y usar ESE chunk para las métricas de confianza, no
+        // ciegamente el primero del array.
+        // Nota: keywordScore se calcula en rerankingService contra los tokens
+        // LITERALES de la query (no contra expanded_terms), así que en casos
+        // donde el chunk correcto solo matchea vía sinónimos expandidos
+        // (ej. "embriagado" en la query vs "alcohol"/"embriaguez" en el corpus),
+        // keywordScore puede quedar en 0 para TODOS los chunks empatados — de
+        // ahí el desempate adicional por número de canales corroborantes.
+        const channelCount = (c) => (c.searchType || '').split('+').filter(Boolean).length;
+        const usedChunks = criticalChunks.concat(supportChunks);
+        const bestChunk = usedChunks.reduce((best, c) => {
+            if (!best) return c;
+            const bestScore = best.finalScore ?? 0;
+            const cScore    = c.finalScore ?? 0;
+            if (cScore > bestScore) return c;
+            if (cScore === bestScore) {
+                const bestKw = best.keywordScore || 0;
+                const cKw    = c.keywordScore || 0;
+                if (cKw > bestKw) return c;
+                if (cKw === bestKw && channelCount(c) > channelCount(best)) return c;
+            }
+            return best;
+        }, null);
+
+        // ── keywordDensity contra términos expandidos (2026-08-03) ────────────
+        // BUG CONFIRMADO (seguimiento_confidence_engine.md #1): bestChunk.keywordScore
+        // viene de rerankingService y se calcula SOLO contra los tokens literales
+        // de la query (`keywords`), nunca contra `expanded_terms` (sinónimos ya
+        // generados por queryUnderstandingService, ej. "embriagado" → "embriaguez",
+        // "alcohol"). Un chunk puede ser el más relevante y haber sido recuperado
+        // vía el canal BM25/expandido usando esos sinónimos, pero su keywordScore
+        // literal queda en 0 porque el texto del corpus usa el término canónico,
+        // no la variante coloquial de la query. Esto subestimaba `confidence_score`
+        // incluso después del fix de "mejor chunk" (mismo bestChunk, misma
+        // subestimación, porque la métrica en sí no veía la señal).
+        // Fix acotado: solo se AUMENTA (nunca se reduce) el keywordDensity
+        // reportado al Confidence Engine, calculando una densidad adicional del
+        // bestChunk contra expandedTerms y tomando el máximo con la literal.
+        // No se toca el criterio de selección de bestChunk ni el finalScore de
+        // reranking — el blast radius queda limitado a la métrica de confianza.
+        const literalKeywordScore = bestChunk ? (bestChunk.keywordScore || 0) : 0;
+        const expandedKeywordScore = bestChunk
+            ? this._computeKeywordDensity(bestChunk.payload?.texto_original, expandedTerms)
+            : 0;
+        const bestKeywordScore = Math.max(literalKeywordScore, expandedKeywordScore);
+
         return {
             contextText: finalContextText.trim(),
             chunksUsed:  criticalChunks.length + supportChunks.length,
             sources:     Array.from(sourcesSet),
-            rawConfidence:  topScore,
+            rawConfidence:  bestChunk ? (bestChunk.finalScore ?? 0) : 0,
+            bestKeywordScore,
+            bestHasSectionRelevance: bestChunk ? (bestChunk.boostReason?.includes('Section') || false) : false,
             logDetails,
         };
+    }
+
+    /**
+     * Densidad de coincidencia de `tokens` (case/acento-insensitive) en `text`.
+     * Usada para medir keywordDensity contra expanded_terms (sinónimos), no
+     * solo contra los tokens literales de la query original.
+     */
+    _computeKeywordDensity(text, tokens) {
+        if (!tokens || tokens.length === 0 || !text) return 0;
+        const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const textNorm = norm(text);
+        const tokensNorm = tokens.map(norm).filter(t => t.length > 0);
+        if (tokensNorm.length === 0) return 0;
+        const present = tokensNorm.filter(t => textNorm.includes(t)).length;
+        return present / tokensNorm.length;
+    }
+
+    // ─── Detección de gibberish ────────────────────────────────────────────
+
+    /**
+     * Match tolerante a plural regular español ("horario"/"horarios",
+     * "procedimiento"/"procedimientos"): compara el token tal cual y, si no
+     * matchea, su forma con/sin "s" final. No es un stemmer real — solo cubre
+     * el caso más común (bug 2026-08-13: KNOWN_VOCAB_EXTRA solo tiene formas
+     * singulares, así que "Horarios." o "Procedimientos..." caían en
+     * gibberish/fuera-de-dominio pese a que "horario"/"procedimiento" sí
+     * están en el vocabulario).
+     */
+    _matchesVocab(token, vocabSet) {
+        if (vocabSet.has(token)) return true;
+        if (token.length > 3 && token.endsWith('s') && vocabSet.has(token.slice(0, -1))) return true;
+        if (token.length > 2 && vocabSet.has(token + 's')) return true;
+        return false;
+    }
+
+    /**
+     * Devuelve true si NINGÚN token significativo de la query original
+     * aparece en el vocabulario conocido (HR español + dominio corporativo).
+     * Esto detecta queries como "xixx", "aaa", "zxqw" sin rechazar queries
+     * válidas de una sola palabra como "uniformes" o "jornada".
+     */
+    _isGibberishQuery(query) {
+        const normalize = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+        // Construir vocabulario unificado la primera vez (lazy singleton)
+        if (!this._knownVocab) {
+            const docPriorityKw = DOC_PRIORITY_MAP.flatMap(r => r.keywords).map(normalize);
+            this._knownVocab = new Set([
+                ...Array.from(SPANISH_STOPWORDS).map(normalize),
+                ...Array.from(KNOWN_VOCAB_EXTRA).map(normalize),
+                ...docPriorityKw,
+                // EXACT_ACRONYMS existía declarado pero nunca se mezclaba aquí
+                // (bug 2026-08-13) — "SG-SST", "COPASST", etc. caían en gibberish.
+                ...EXACT_ACRONYMS.map(normalize),
+            ]);
+        }
+
+        const tokens = normalize(query)
+            .replace(/[¿?¡!.,;:()\[\]{}"']/g, ' ')
+            .split(/\s+/)
+            .filter(t => t.length > 2);
+
+        if (tokens.length === 0) return false; // query vacía — no es gibberish
+
+        // Si AL MENOS UN token está en el vocabulario → query comprensible
+        return tokens.every(t => !this._matchesVocab(t, this._knownVocab));
+    }
+
+    // ─── Relevancia Temática Mínima (2026-08-03) ───────────────────────────
+
+    /**
+     * Devuelve true si AL MENOS UN token significativo (no-stopword) de la
+     * query aparece en el vocabulario HR CURADO (KNOWN_VOCAB_EXTRA +
+     * keywords de DOC_PRIORITY_MAP).
+     *
+     * Distinto de `_isGibberishQuery`: ese método considera "comprensible"
+     * cualquier oración gramatical española (basta con que aparezca un
+     * stopword como "el"/"más"/"cuál" para no ser gibberish) — sirve para
+     * detectar ruido sin sentido ("xzq wblk"), NO para detectar si el TEMA
+     * de la query es ajeno al dominio de Plastitec ("¿Cuál es la capital de
+     * Francia?" es gramaticalmente válida pero no tiene ningún término HR).
+     * Este método excluye SPANISH_STOPWORDS del vocabulario de comparación
+     * a propósito, para que una query sin ningún término de dominio real
+     * no cuente como relevante solo por tener palabras funcionales comunes.
+     */
+    _hasHRDomainToken(query) {
+        const normalize = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+        // BUG CORREGIDO (2026-08-03, seguimiento_4.md): KNOWN_VOCAB_EXTRA incluye
+        // un puñado de interrogativos/verbos genéricos ('cuantos', 'cuántas',
+        // 'aplica', 'aplican', 'permite', 'pueden') agregados a propósito para
+        // _isGibberishQuery (permisivo por diseño: evita falsos positivos de
+        // gibberish en preguntas de una sola palabra). Reutilizar ese mismo set
+        // aquí sin excluirlos permitía que preguntas fuera de dominio como
+        // "¿Cuántos planetas tiene el sistema solar?" cruzaran este guardrail
+        // solo por contener "cuantos" — exactamente el tipo de falso positivo
+        // que este método existe para bloquear. Se excluyen explícitamente.
+        const GENERIC_NON_DOMAIN_TERMS = new Set([
+            'cuantas', 'cuántas', 'cuantos', 'cuántos',
+            'aplica', 'aplican', 'permite', 'pueden',
+        ].map(normalize));
+
+        if (!this._hrVocabOnly) {
+            const docPriorityKw = DOC_PRIORITY_MAP.flatMap(r => r.keywords).map(normalize);
+            this._hrVocabOnly = new Set([
+                ...Array.from(KNOWN_VOCAB_EXTRA).map(normalize),
+                ...docPriorityKw,
+                // Ver mismo fix en _isGibberishQuery: EXACT_ACRONYMS nunca se mezclaba.
+                ...EXACT_ACRONYMS.map(normalize),
+            ].filter(t => !GENERIC_NON_DOMAIN_TERMS.has(t)));
+        }
+        if (!this._normalizedStopwords) {
+            this._normalizedStopwords = new Set(Array.from(SPANISH_STOPWORDS).map(normalize));
+        }
+
+        const tokens = normalize(query)
+            .replace(/[¿?¡!.,;:()\[\]{}"']/g, ' ')
+            .split(/\s+/)
+            .filter(t => t.length > 2 && !this._normalizedStopwords.has(t));
+
+        if (tokens.length === 0) return false;
+
+        return tokens.some(t => this._matchesVocab(t, this._hrVocabOnly));
     }
 
     // ─── Limpieza de texto ─────────────────────────────────────────────────

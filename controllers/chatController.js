@@ -6,14 +6,22 @@ import PrivacyService, { CATEGORIES } from '../services/privacy.js';
 import ragService from '../services/ragService.js';
 import { cleanResponse } from '../utils/textProcessor.js';
 import { logAnalyticsEvent, logErrorEvent } from '../utils/logger.js';
+import { SYSTEM_MESSAGES } from '../config/systemMessages.js';
 
-// ── Configuración (2026-06-17) ───────────────────────────────────────────────
-// CACHE_ENABLED: flag REVERSIBLE. false (default) = caché SQLite OFF tanto en
-//   lectura (findSimilar) como en escritura (storeOrUpdate); cada consulta va
-//   fresca al pipeline RAG. Reactivar = poner CACHE_ENABLED=true en .env.
-//   El código de caché y la tabla NO se eliminan: solo se envuelven en el flag.
+// ── Configuración (2026-06-17, split 2026-08-14) ─────────────────────────────
+// Lectura y escritura de SQLite ahora son flags INDEPENDIENTES (antes un solo
+// CACHE_ENABLED controlaba ambas). Motivo: se quiere volver a alimentar la
+// tabla de conocimiento (para análisis/auditoría — confianza, IP, etc.) SIN
+// que las respuestas se sirvan desde caché — cada consulta sigue yendo fresca
+// al pipeline RAG.
+// CACHE_READ_ENABLED  (default false) = si true, findSimilar() puede servir
+//   una respuesta ya guardada en vez de invocar el RAG (mejora de tiempos).
+// CACHE_WRITE_ENABLED (default true)  = si true, cada respuesta de RAG con
+//   contenido real se guarda/actualiza en knowledge_base para consulta u
+//   análisis posterior, aunque nunca se lea de vuelta para responder.
 // MAX_QUERY_LENGTH: tope de caracteres de la consulta (defensa de backend).
-const CACHE_ENABLED = String(process.env.CACHE_ENABLED || 'false').toLowerCase() === 'true';
+const CACHE_READ_ENABLED  = String(process.env.CACHE_READ_ENABLED  || 'false').toLowerCase() === 'true';
+const CACHE_WRITE_ENABLED = String(process.env.CACHE_WRITE_ENABLED || 'true').toLowerCase() === 'true';
 const MAX_QUERY_LENGTH = parseInt(process.env.MAX_QUERY_LENGTH, 10) || 200;
 
 // ── H-01: Blocklist de inyección de prompt (2026-06-18) ─────────────────────
@@ -36,11 +44,7 @@ const INJECTION_PATTERNS = [
     /tus\s+instrucciones\s+anteriores/i,
 ];
 
-if (CACHE_ENABLED) {
-    console.log('[Cache] Caché HABILITADO (CACHE_ENABLED=true) — lectura+escritura SQLite activas');
-} else {
-    console.log('[Cache] Caché DESHABILITADO (CACHE_ENABLED=false) — todas las consultas van al RAG');
-}
+console.log(`[Cache] Lectura SQLite: ${CACHE_READ_ENABLED ? 'HABILITADA' : 'deshabilitada'} (CACHE_READ_ENABLED) | Escritura SQLite: ${CACHE_WRITE_ENABLED ? 'HABILITADA' : 'deshabilitada'} (CACHE_WRITE_ENABLED)`);
 
 // ── Filtro de calidad para ESCRITURA en caché (2026-06-16) ───────────────────
 // Cachear SOLO respuestas con contenido real del RAG; no rechazos/no-respuestas.
@@ -113,7 +117,7 @@ export const postQuery = async (req, res) => {
         if (initialCategory === CATEGORIES.CONFIDENCIAL) {
             logAnalyticsEvent('SecurityBlocked', { query, category: 'confidencial' });
             return res.json({
-                response: "No puedo proporcionar información confidencial sobre salarios o datos personales.\nPara conocer tu información exacta, consulta directamente con RRHH.",
+                response: SYSTEM_MESSAGES.CONFIDENTIAL,
                 outOfScope: true,
                 securityBlocked: true
             });
@@ -143,8 +147,8 @@ export const postQuery = async (req, res) => {
             });
         }
 
-        // 2. Búsqueda en Caché SQLite (solo si CACHE_ENABLED)
-        if (CACHE_ENABLED && initialCategory === CATEGORIES.REGLAMENTO && !bypass_cache) {
+        // 2. Búsqueda en Caché SQLite (solo si CACHE_READ_ENABLED)
+        if (CACHE_READ_ENABLED && initialCategory === CATEGORIES.REGLAMENTO && !bypass_cache) {
             const startSqlite = Date.now();
             try {
                 const cachedResult = await DatabaseService.findSimilar(query);
@@ -177,13 +181,21 @@ export const postQuery = async (req, res) => {
 
         if (ragResult.error === 'no_context') {
             stats.total_ms = Date.now() - startTotal;
-            logAnalyticsEvent('UnansweredQuery', { query, reason: 'no_context', maxScore: ragResult.qdrantResults?.[0]?.score || 0 });
+            const unansweredConversationId = conversationId || crypto.randomUUID();
+            logAnalyticsEvent('UnansweredQuery', {
+                conversationId: unansweredConversationId,
+                clientIp: req.ip,
+                query,
+                response: SYSTEM_MESSAGES.NO_MATCH,
+                reason: 'no_context',
+                maxScore: ragResult.qdrantResults?.[0]?.score || 0
+            });
             return res.json({
-                response: "No encontré información relevante en el reglamento para responder esta pregunta.",
+                response: SYSTEM_MESSAGES.NO_MATCH,
                 outOfScope: false,
                 category: initialCategory,
                 ragStatus: 'low_relevance',
-                conversationId: conversationId || crypto.randomUUID()
+                conversationId: unansweredConversationId
             });
         }
 
@@ -191,22 +203,33 @@ export const postQuery = async (req, res) => {
         const finalCategory = PrivacyService.classify(query);
         stats.total_ms = Date.now() - startTotal;
 
-        // 4. Guardar en SQLite (Aprendizaje progresivo)
+        // 4. Guardar en SQLite (solo escritura — ver CACHE_WRITE_ENABLED arriba;
+        //    no se usa para responder, solo para análisis/auditoría posterior).
         // bypass_cache también desactiva la escritura: una corrida de benchmark
-        // no debe contaminar la caché ni heredar respuestas entre tests.
-        // Filtro de calidad: solo se cachean respuestas con contenido real,
+        // no debe contaminar la tabla ni heredar respuestas entre tests.
+        // Filtro de calidad: solo se guardan respuestas con contenido real,
         // nunca rechazos/no-respuestas (reemplaza el guard viejo inútil que solo
         // miraba "No tengo información", frase que el LLM nunca produce).
-        if (CACHE_ENABLED && finalCategory === CATEGORIES.REGLAMENTO && !bypass_cache && isQualityAnswer(responseText)) {
+        if (CACHE_WRITE_ENABLED && finalCategory === CATEGORIES.REGLAMENTO && !bypass_cache && isQualityAnswer(responseText)) {
             const KV_FILE = path.join(process.cwd(), 'knowledge_version.json');
             let kv = 0;
             try { kv = JSON.parse(fs.readFileSync(KV_FILE, 'utf8')).version || 0; } catch(e){}
-            await DatabaseService.storeOrUpdate(query, responseText, 'general', 'gemma_rag', kv);
+            await DatabaseService.storeOrUpdate(query, responseText, 'general', 'gemma_rag', kv, ragResult.confidence || 0, req.ip);
         }
 
         // 5. Logging Auditoría + Performance
+        // conversationId calculado UNA vez y reusado en log + respuesta: antes se
+        // generaba un randomUUID() distinto en cada sitio, y el log ni siquiera
+        // guardaba el texto de la respuesta — el emparejamiento pregunta↔respuesta
+        // en reportes posteriores dependía de la posición en el archivo, que se
+        // desalinea bajo escritura concurrente (2 tablets).
+        const finalConversationId = conversationId || crypto.randomUUID();
+        const finalResponseText = stripFabricatedNote(query, responseText);
         logAnalyticsEvent('RAGQueryMetrics', {
+            conversationId: finalConversationId,
+            clientIp: req.ip,
             query,
+            response: finalResponseText,
             category: finalCategory,
             ...stats,
             chunksUsed: ragResult.chunksUsed,
@@ -214,7 +237,7 @@ export const postQuery = async (req, res) => {
         });
 
         res.json({
-            response: stripFabricatedNote(query, responseText),
+            response: finalResponseText,
             outOfScope: finalCategory !== CATEGORIES.REGLAMENTO,
             category: finalCategory,
             confidence: ragResult.confidence || 0,
@@ -222,7 +245,7 @@ export const postQuery = async (req, res) => {
             chunksUsed: ragResult.chunksUsed || 0,
             retrievalLogs: ragResult.retrievalLogs || null,
             context: ragResult.context || null,
-            conversationId: conversationId || crypto.randomUUID()
+            conversationId: finalConversationId
         });
 
     } catch (error) {

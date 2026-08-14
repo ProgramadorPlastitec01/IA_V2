@@ -1,15 +1,16 @@
 /**
  * ResponseBuilderService
- * 
+ *
  * Toma los hechos crudos en JSON generados por el LLM extractivo y construye
  * respuestas determinísticas en lenguaje natural sin alucinaciones.
  */
+import { SYSTEM_MESSAGES } from '../config/systemMessages.js';
 
 class ResponseBuilderService {
-    
+
     /**
-     * @param {Object} jsonFacts 
-     * @param {string} mode 
+     * @param {Object} jsonFacts
+     * @param {string} mode
      */
     build(jsonFacts, mode) {
         if (!jsonFacts) {
@@ -18,7 +19,7 @@ class ResponseBuilderService {
 
         // Fallback or Missing Info
         if (jsonFacts.error === 'no_information_found' || jsonFacts.contains_answer === false) {
-            return "No se encontró información suficiente en los documentos consultados para responder esta pregunta.";
+            return SYSTEM_MESSAGES.INSUFFICIENT_CONTEXT;
         }
 
         try {

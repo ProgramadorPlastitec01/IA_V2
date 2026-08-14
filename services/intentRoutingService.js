@@ -109,8 +109,13 @@ class IntentRoutingService {
     getParams(intent) {
         switch (intent) {
             case INTENT_CATEGORIES.CORPORATIVA:
+                // topK subido de 4 a 12 (2026-08-03, seguimiento_3.md #3): 'empresa' está
+                // en la lista de keywords de este intent y es una palabra casi universal
+                // en preguntas de RRHH (disciplina, redes sociales, etc.), no solo de
+                // misión/visión/historia. Con topK=4 el canal semántico quedaba
+                // severamente desabastecido para esas preguntas mal clasificadas.
                 return {
-                    topK: 4,
+                    topK: 12,
                     minScore: 0.50,
                     prioritizeCategory: 'CORPORATIVA',
                     boostValue: 0.25
@@ -130,8 +135,12 @@ class IntentRoutingService {
                     boostValue: 0.15
                 };
             default:
+                // topK subido de 12 a 20 (2026-08-03, seguimiento_3.md #3): mitigación
+                // parcial para artículos del RIT partidos entre varios chunks (Art. 110),
+                // donde el chunk con el título/número no gana suficiente score para
+                // entrar en un topK de 12 en frases coloquiales sin la frase exacta.
                 return {
-                    topK: 12,
+                    topK: 20,
                     minScore: 0.40,
                     prioritizeCategory: null,
                     boostValue: 0

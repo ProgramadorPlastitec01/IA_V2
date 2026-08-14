@@ -43,7 +43,7 @@ flowchart TD
     
     %% Validation
     J --> K[retrievalConfidence]
-    K --> L{Confidence > 0.40?}
+    K --> L{Confidence > 0.20?}
     L -- No --> M[Respuesta Negativa Segura]
     
     %% Generation

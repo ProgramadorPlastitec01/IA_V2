@@ -196,6 +196,7 @@ switch ($action) {
         Kill-ProcessOnPort $PORTS.Backend
         Kill-ProcessOnPort $PORTS.Frontend
         Kill-ProcessOnPort $PORTS.Qdrant
+        Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
         Log-Message "OK." "Green"
     }
     "diagnose" {

@@ -36,6 +36,19 @@ const rotateLogIfNeeded = (filePath) => {
     }
 };
 
+// Cola FIFO de escritura: bajo concurrencia (2+ dispositivos pegándole al
+// backend a la vez) fs.appendFile async sin cola puede completar en orden
+// distinto al de llegada de las requests, desalineando qué línea del log
+// corresponde a qué evento real. Encadenar cada escritura a la promesa
+// anterior garantiza orden de aparición en el archivo == orden de llamada.
+let writeQueue = Promise.resolve();
+const appendOrdered = (filePath, line) => {
+    writeQueue = writeQueue
+        .then(() => fs.promises.appendFile(filePath, line))
+        .catch((err) => console.error(`Error writing to ${path.basename(filePath)}:`, err));
+    return writeQueue;
+};
+
 /**
  * Helper to log analytics events to JSONL file with rotation
  */
@@ -46,9 +59,7 @@ export const logAnalyticsEvent = (type, data) => {
         type,
         ...data
     };
-    fs.appendFile(LOG_FILE, JSON.stringify(event) + '\n', (err) => {
-        if (err) console.error('Error writing to analytics log:', err);
-    });
+    appendOrdered(LOG_FILE, JSON.stringify(event) + '\n');
 };
 
 /**
@@ -66,7 +77,5 @@ export const logErrorEvent = (type, module, message, stack = null, details = {})
         status: 'pending',
         details
     };
-    fs.appendFile(ERRORS_FILE, JSON.stringify(errorEvent) + '\n', (err) => {
-        if (err) console.error('Error writing to errors log:', err);
-    });
+    appendOrdered(ERRORS_FILE, JSON.stringify(errorEvent) + '\n');
 };

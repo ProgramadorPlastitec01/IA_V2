@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import { runOnOllama } from '../utils/ollamaGate.js';
+
 /**
  * EmbeddingsService v2.0 — Plastitec AI
  *
@@ -117,17 +119,18 @@ class EmbeddingsService {
         const controller = new AbortController();
         const timeout    = setTimeout(() => controller.abort(), this._timeoutMs);
 
-        // Prevenir crashes: mxbai-embed-large soporta 512 tokens. 
-        // Textos con mucho código pueden superar los 512 tokens incluso con 1200 caracteres.
-        const safeText = text.length > 1200 ? text.substring(0, 1200) : text;
+        // mxbai-embed-large: 512 tokens. Texto legal español denso ≈ 3–4 chars/token,
+        // por lo que 1200 chars puede superar el límite. Truncar en 900 chars (~300 tokens)
+        // deja margen seguro sin perder los conceptos clave (siempre en el primer tercio).
+        const safeText = text.length > 900 ? text.substring(0, 900) : text;
 
         try {
-            const response = await fetch(`${this.ollamaUrl}/api/embeddings`, {
+            const response = await runOnOllama(() => fetch(`${this.ollamaUrl}/api/embeddings`, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({ model: this.ollamaModel, prompt: safeText }),
                 signal:  controller.signal,
-            });
+            }));
 
             if (!response.ok) {
                 const errorText = await response.text();

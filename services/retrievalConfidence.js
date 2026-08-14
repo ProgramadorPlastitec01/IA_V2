@@ -133,6 +133,16 @@ class RetrievalConfidenceEngine {
 
         const vaguenessFlags = [];
 
+        // Penalización por baja especificidad: query de ≤1 token significativo
+        // sin señal léxica. El embedding puro de gibberish puede retornar
+        // similitudes altas al corpus (el reranker infla el score × 10).
+        // Este multiplicador asegura que caiga bajo el gate de 0.20.
+        if (querySpecificityTokens <= 1 && !hasPhraseMatch && !hasAcronymMatch) {
+            confidence *= 0.35;
+            vaguenessFlags.push('SINGLE_TOKEN_NO_SIGNAL');
+            console.log('[ConfidenceEngine] ≤1 token sin señal léxica → penalización × 0.35');
+        }
+
         if (hasAcronymMatch) {
             // Bypass: un acrónimo corporativo ya es altamente específico por definición.
             console.log(`[ConfidenceEngine] Bypass acrónimo corporativo (referentes: ${domainReferents})`);

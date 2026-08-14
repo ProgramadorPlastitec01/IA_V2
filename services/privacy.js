@@ -21,14 +21,31 @@ export const CATEGORIES = {
 };
 
 const SENSITIVE_KEYWORDS = [
-    // --- CATEGORÍA: CONFIDENCIAL ---
+    // --- CATEGORÍA: CONFIDENCIAL (datos personales, primera persona) ---
     'mi salario', 'mi sueldo', 'mi pago', 'mi nómina', 'mi contrato',
     'cuánto gano', 'cuanto gano', 'mis ingresos', 'salario exacto',
     'desprendible de pago', 'comprobante de pago',
     'salario de', 'sueldo de', 'cuánto gana', 'cuanto gana',
     'bonificación personal', 'comisión personal',
     'mi cuenta bancaria', 'mi tarjeta', 'mi nit', 'mi cédula', 'mi cedula',
-    'mi dirección', 'mi telefono', 'mi correo personal'
+    'mi dirección', 'mi telefono', 'mi correo personal',
+
+    // --- CATEGORÍA: CONFIDENCIAL (salario/pago en general, 2026-08-13) ---
+    // Ampliado a propósito: antes solo se bloqueaban preguntas en primera
+    // persona ("mi salario"); preguntas generales sobre montos ("¿cuál es
+    // el salario de un operario?") pasaban de largo al RAG normal, donde el
+    // LLM podía intentar inferir cifras del RIT que no le corresponde dar.
+    // Se usan frases compuestas (no la palabra "pago" sola) para no bloquear
+    // preguntas legítimas de política/procedimiento que solo mencionan pago
+    // de pasada (ej. "¿cómo reporto un accidente?").
+    'salario', 'sueldo', 'nómina', 'nomina',
+    'cuánto paga', 'cuanto paga', 'cuánto se paga', 'cuanto se paga',
+    'cuánto se gana', 'cuanto se gana', 'valor del salario', 'monto del salario',
+    'pago de horas extra', 'pago de horas extras',
+    'liquidación salarial', 'liquidacion salarial',
+    'incremento salarial', 'aumento de sueldo', 'aumento salarial',
+    'deducciones de nómina', 'deducciones de nomina',
+    'retención en la fuente', 'retencion en la fuente',
 ];
 
 const CASUAL_KEYWORDS = ['hola', 'buen día', 'buenos días', 'buenas tardes', 'buenas noches', 'gracias', 'gracias!', 'ok', 'perfecto', 'quién eres', 'quien eres'];

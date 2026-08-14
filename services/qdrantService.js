@@ -225,7 +225,15 @@ class QdrantService {
                                 match: { text: t },
                             })),
                         },
-                        limit:        topK * 2, // Traer más para poder puntuar
+                        // BUG CORREGIDO (2026-08-14): `scroll` con filtro `should` devuelve
+                        // puntos en orden de almacenamiento, NO por relevancia. Con topK*2
+                        // (p.ej. 30) y una query con varios términos comunes, el chunk más
+                        // relevante puede quedar fuera del lote truncado ANTES de llegar al
+                        // scoring por frecuencia de abajo — el candidato correcto nunca se
+                        // evalúa. La colección es pequeña (~400-500 puntos), así que traer
+                        // el universo completo de candidatos y puntuar todos es barato y
+                        // elimina el truncamiento prematuro no relacionado con relevancia.
+                        limit:        500,
                         with_payload: true,
                     }),
                 }
@@ -301,7 +309,9 @@ class QdrantService {
                                 },
                             ],
                         },
-                        limit:        topK * 2,
+                        // Ver mismo fix/comentario en searchKeyword() — scroll+filtro no
+                        // ordena por relevancia, así que se trae el universo completo.
+                        limit:        500,
                         with_payload: true,
                     }),
                 }
@@ -411,6 +421,33 @@ class QdrantService {
                 .sort((a, b) => (a.chunk_index || 0) - (b.chunk_index || 0));
 
         }, 'fetchAllChunksFromSource');
+    }
+
+    /**
+     * Lista los valores distintos de `fuente` (documentos indexados) en la
+     * colección. La colección es pequeña (cientos de puntos), así que un
+     * solo scroll pidiendo solo el campo `fuente` es suficiente — no hace
+     * falta un facet/aggregate dedicado.
+     */
+    async listDistinctSources() {
+        return await this._withRetry(async () => {
+            const response = await fetch(
+                `${this.url}/collections/${this.collection}/points/scroll`,
+                {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        limit:        2000,
+                        with_payload: ['fuente'],
+                        with_vector:  false,
+                    }),
+                }
+            );
+            if (!response.ok) throw new Error(await response.text());
+            const result = await response.json();
+            const points = result.result?.points || [];
+            return Array.from(new Set(points.map(p => p.payload?.fuente).filter(Boolean)));
+        }, 'listDistinctSources');
     }
 
     /**

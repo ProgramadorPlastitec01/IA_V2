@@ -20,8 +20,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const DOCS_DIR   = path.join(__dirname, '..', 'docs');
 
+// ─── Archivos excluidos de la ingesta ─────────────────────────────────────
+// Mantener aquí: documentos derogados, comunicados obsoletos y meta-archivos
+// técnicos que no son contenido RRHH del corpus de consulta.
+const EXCLUDED_FILES = new Set([
+    'OPERATION_MANUAL.md',                    // manual operativo del sistema
+    'PROJECT_CONTEXT.md',                     // meta: contexto técnico del proyecto
+    'TECHNICAL_MANUAL.md',                    // meta: manual técnico del proyecto
+    'RIT_PLASTITEC_25_NOV_2025.md',           // RIT derogado (vigente: 01-Jul-2026)
+    'COMUNICADO_RIT_PLASTITEC_25_NOV_2025.md', // comunicado del RIT derogado
+]);
+
 // ─── Configuración de chunking ─────────────────────────────────────────────
-const CHUNK_SIZE    = 1200;  // Chars por chunk — suficiente para sección + lista
+const CHUNK_SIZE    = 900;   // Chars por chunk — ajustado al límite de tokens de mxbai-embed-large
 const CHUNK_OVERLAP = 150;   // Overlap entre chunks — preserva contexto
 const MIN_CHUNK_LEN = 60;    // Descartar chunks muy cortos
 
@@ -32,6 +43,8 @@ const SECTION_HEADER_RE = /^(?:#{1,4}\s+.{3,80}|[A-ZÁÉÍÓÚÑ0-9\s\-.:]{5,60}
 const LIST_ITEM_RE = /^\s*(?:\d+[.)]\s+|[-•*►]\s+)/;
 // Detecta tabla simple (separadores |)
 const TABLE_ROW_RE = /^\|.+\|/;
+// Detecta header de artículo numerado ("### ARTÍCULO 89." / "ARTICULO 110.")
+const ARTICLE_HEADER_RE = /^#{1,4}\s*ART[IÍ]CULO[S]?\.?\s+\d+/i;
 
 // ─── Clase principal ───────────────────────────────────────────────────────
 
@@ -180,6 +193,119 @@ class IngestionService {
         return chunks;
     }
 
+    // ─── CHUNKING HEADER-AWARE POR ARTÍCULO (RIT, seguimiento_5.md #2) ──────
+
+    /**
+     * Chunking especializado para documentos con estructura de artículos
+     * numerados ("### ARTÍCULO 89. Título.") — pensado para el RIT.
+     *
+     * Problema que resuelve: `_semanticChunking` genérico trata el header de
+     * artículo como un bloque HEADER más; cuando el cuerpo del artículo es
+     * grande, el flush por tamaño puede separar el header (queda solo en un
+     * chunk) del cuerpo (fragmentado en chunks siguientes sin el título), y
+     * el overlap heurístico no lo rescata porque solo aplica a bloques
+     * PARAGRAPH. Casos confirmados: Art. 89 (redes sociales) y Art. 110
+     * (justa causa) — ver seguimiento_2.md.
+     *
+     * Estrategia: partir el texto por límites de "### ARTÍCULO N." y tratar
+     * cada artículo como una unidad atómica header+cuerpo. Si la unidad cabe
+     * en un margen relajado (1.4x CHUNK_SIZE — evita cortar numerales o
+     * causales a mitad para artículos algo más largos que el promedio), se
+     * emite como un solo chunk. Si no cabe, el cuerpo se fragmenta respetando
+     * límites de ítems (numerales/causales/párrafos) y el header del
+     * artículo se antepone literalmente a CADA fragmento, para que el texto
+     * recuperable siempre contenga el número y título del artículo.
+     *
+     * Limitación conocida: encabezados de capítulo/sección que preceden
+     * inmediatamente a un "ARTÍCULO N." quedan como cola del artículo
+     * anterior (no se reasignan al siguiente) — cosmético, no reintroduce el
+     * bug de header separado del cuerpo.
+     *
+     * @param {string} text - Texto completo del documento
+     * @returns {Array<{text, sectionTitle, blockTypes}>}
+     */
+    _semanticChunkingByArticle(text) {
+        const ARTICLE_MAX = Math.round(CHUNK_SIZE * 1.4);
+        const parts = text.split(/\n(?=#{1,4}\s*ART[IÍ]CULO[S]?\.?\s+\d+)/i);
+        const chunks = [];
+
+        // Preámbulo antes del primer "ARTÍCULO N." (portada, índice, etc.)
+        if (parts.length > 0 && !ARTICLE_HEADER_RE.test(parts[0].trim().split('\n')[0] || '')) {
+            const preamble = parts.shift();
+            if (preamble && preamble.trim().length >= MIN_CHUNK_LEN) {
+                chunks.push(...this._semanticChunking(preamble));
+            }
+        }
+
+        for (const unit of parts) {
+            const trimmedUnit = unit.trim();
+            if (!trimmedUnit) continue;
+
+            const lines      = trimmedUnit.split('\n');
+            const headerLine = lines[0].trim();
+            const headerText = headerLine.replace(/^#+\s*/, '').trim();
+            const body        = lines.slice(1).join('\n').trim();
+
+            if (!body) {
+                chunks.push({ text: headerText, sectionTitle: headerText.substring(0, 80), blockTypes: ['ARTICLE_HEADER_ONLY'] });
+                continue;
+            }
+
+            const combined = `${headerText}\n\n${body}`;
+            if (combined.length <= ARTICLE_MAX) {
+                chunks.push({
+                    text:         combined,
+                    sectionTitle: headerText.substring(0, 80),
+                    blockTypes:   ['ARTICLE_UNIT'],
+                });
+            } else {
+                const bodyFragments = this._splitBodyPreservingItems(body, CHUNK_SIZE);
+                for (const frag of bodyFragments) {
+                    chunks.push({
+                        text:         `${headerText}\n\n${frag}`,
+                        sectionTitle: headerText.substring(0, 80),
+                        blockTypes:   ['ARTICLE_UNIT_FRAGMENT'],
+                    });
+                }
+            }
+        }
+
+        return chunks;
+    }
+
+    /**
+     * Fragmenta el cuerpo de un artículo sin partir numerales, causales
+     * (a), b)...) ni romanos (I., II...) a mitad. Agrupa ítems completos de
+     * forma voraz hasta el límite de tamaño; si no detecta estructura de
+     * lista, cae a párrafos y luego a `_splitLargeParagraph`.
+     */
+    _splitBodyPreservingItems(body, maxLen) {
+        const ITEM_BOUNDARY_RE = /\n(?=\s*(?:\d+[.)]\s|[a-zA-Z][.)]\s|[IVXivx]+[.)]\s))/;
+        let units = body.split(ITEM_BOUNDARY_RE).map(u => u.trim()).filter(Boolean);
+
+        if (units.length <= 1) {
+            units = body.split(/\n{2,}/).map(u => u.trim()).filter(Boolean);
+        }
+        if (units.length <= 1) {
+            return this._splitLargeParagraph(body);
+        }
+
+        const groups = [];
+        let current = [];
+        let len = 0;
+        for (const u of units) {
+            if (len + u.length > maxLen && current.length > 0) {
+                groups.push(current.join('\n\n'));
+                current = [];
+                len = 0;
+            }
+            current.push(u);
+            len += u.length + 2;
+        }
+        if (current.length > 0) groups.push(current.join('\n\n'));
+        return groups;
+    }
+
     /**
      * Divide una lista muy grande en sub-chunks respetando items completos.
      */
@@ -314,9 +440,9 @@ class IngestionService {
             await qdrantService.createCollectionIfNotExists();
 
             const allFiles = await fs.readdir(DOCS_DIR);
-            const files    = allFiles.filter(f => 
-                (f.endsWith('.pdf') || f.endsWith('.txt') || f.endsWith('.md')) && 
-                f !== 'OPERATION_MANUAL.md'
+            const files    = allFiles.filter(f =>
+                (f.endsWith('.pdf') || f.endsWith('.txt') || f.endsWith('.md')) &&
+                !EXCLUDED_FILES.has(f)
             );
 
             console.log(`📂 Documentos encontrados: ${files.length}`);
