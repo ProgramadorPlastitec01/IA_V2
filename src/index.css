@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 /* Inter self-hosted (offline-safe para kiosco Tomcat). Procesado por Vite →
    se hashea y la URL se reescribe respetando base './'. Fallback: system-ui. */
@@ -45,6 +45,21 @@
   --color-cat-amber:  #854F0B;  --color-cat-amber-fill:  #FAEEDA;
   --color-cat-green:  #3B6D11;  --color-cat-green-fill:  #EAF3DE;
   --color-cat-purple: #534AB7;  --color-cat-purple-fill: #EEEDFE;
+
+  /* ── Kiosco 2026-10-09 — paleta del rediseño de pantalla de inicio
+     (kiosko de autoservicio, tema claro). El acento es un alias del azul
+     de marca (--color-brand) para que botones, bordes y contadores del
+     kiosco usen el mismo azul pastel que el resto del app — no el verde
+     esmeralda original del prototipo de referencia. ── */
+  --color-kiosk-bg:          #f1f5f9;
+  --color-kiosk-panel:       #f8fafc;
+  --color-kiosk-card:        #ffffff;
+  --color-kiosk-card-hover:   #f1f5f9;
+  --color-kiosk-border:      #e2e8f0;
+  --color-kiosk-text:        #0f172a;
+  --color-kiosk-muted:       #64748b;
+  --color-kiosk-accent:      var(--color-brand);
+  --color-kiosk-accent-hover: var(--color-brand-hover);
 
   /* ──────────────────────────────────────────────────────────── */
 

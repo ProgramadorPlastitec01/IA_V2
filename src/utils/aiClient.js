@@ -187,6 +187,36 @@ class AIClient {
         this.conversationId = null;
         QuickCache.clear();
     }
+
+    /**
+     * Guarda la calificación de una respuesta (😞/😐/😊) en SQLite
+     * (tabla answer_ratings) vía /api/rate-answer. No bloquea la UI.
+     */
+    async rateAnswer({ rating, question, answer, sources, conversationId }) {
+        const res = await fetch(`${this.apiBaseUrl}/api/rate-answer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rating, question, answer, sources, conversationId })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo enviar la calificación.');
+        return data;
+    }
+
+    /**
+     * Envía un mensaje del Buzón de Sugerencias a /api/suggestions (SQLite,
+     * tabla `suggestions`). Puede enviarse anónimo (sin name/area).
+     */
+    async submitSuggestion({ type, message, name, area }) {
+        const res = await fetch(`${this.apiBaseUrl}/api/suggestions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, message, name, area })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo enviar el mensaje.');
+        return data;
+    }
 }
 
 export default new AIClient();

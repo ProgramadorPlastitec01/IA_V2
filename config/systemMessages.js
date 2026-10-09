@@ -28,6 +28,12 @@ export const SYSTEM_MESSAGES = {
     // pregunta con evidencia suficiente.
     INSUFFICIENT_CONTEXT: 'No se encontró información suficiente en los documentos consultados para responder esta pregunta.',
 
+    // (2026-10-08) El LLM generó una respuesta que repite un término de la
+    // pregunta que NO existe en ningún documento (premisa no respaldada, ej.
+    // "El día de cumpleaños es libre"). Se usa como prefijo + «términos».
+    UNSUPPORTED_PREMISE_PREFIX: 'No encontré información sobre',
+    UNSUPPORTED_PREMISE_SUFFIX: 'en la documentación disponible.',
+
     // Preguntas sobre salarios, pagos, nómina o datos personales — la única
     // categoría que redirige explícitamente a RRHH.
     CONFIDENTIAL: 'No puedo proporcionar información confidencial sobre salarios, pagos o datos personales.\nPara conocer esta información, consulta directamente con RRHH.',

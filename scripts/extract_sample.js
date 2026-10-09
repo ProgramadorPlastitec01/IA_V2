@@ -14,7 +14,7 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPORTS_DIR = path.join(__dirname, '..', 'reports');
 const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
-const COLLECTION = 'plastitec_docs';
+const COLLECTION = process.env.QDRANT_COLLECTION || 'plastitec_docs_p0';
 
 async function getSampleChunks() {
     const res = await fetch(`${QDRANT_URL}/collections/${COLLECTION}/points/scroll`, {

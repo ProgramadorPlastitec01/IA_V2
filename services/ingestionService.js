@@ -12,24 +12,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import pdfProcessor from './pdfProcessor.js';
 import crypto from 'crypto';
-import { fileURLToPath } from 'url';
 import embeddingsService from './embeddingsService.js';
 import qdrantService from './qdrantService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-const DOCS_DIR   = path.join(__dirname, '..', 'docs');
-
-// ─── Archivos excluidos de la ingesta ─────────────────────────────────────
-// Mantener aquí: documentos derogados, comunicados obsoletos y meta-archivos
-// técnicos que no son contenido RRHH del corpus de consulta.
-const EXCLUDED_FILES = new Set([
-    'OPERATION_MANUAL.md',                    // manual operativo del sistema
-    'PROJECT_CONTEXT.md',                     // meta: contexto técnico del proyecto
-    'TECHNICAL_MANUAL.md',                    // meta: manual técnico del proyecto
-    'RIT_PLASTITEC_25_NOV_2025.md',           // RIT derogado (vigente: 01-Jul-2026)
-    'COMUNICADO_RIT_PLASTITEC_25_NOV_2025.md', // comunicado del RIT derogado
-]);
+// Archivos excluidos de la ingesta: definidos en config/corpusFiles.js
+// (compartido con citationValidator, que necesita el mismo corpus).
+import { DOCS_DIR, isCorpusFile } from '../config/corpusFiles.js';
 
 // ─── Configuración de chunking ─────────────────────────────────────────────
 const CHUNK_SIZE    = 900;   // Chars por chunk — ajustado al límite de tokens de mxbai-embed-large
@@ -101,18 +88,40 @@ class IngestionService {
         });
 
         // 3. Agrupar bloques en chunks respetando estructura
+        //
+        // BUG CORREGIDO (2026-10-08): la "Regla 1" (no separar HEADER de su
+        // bloque siguiente) estaba invertida — evitaba vaciar el chunk justo
+        // cuando llegaba un HEADER, así que el título quedaba como ÚLTIMA línea
+        // del chunk anterior y su cuerpo empezaba el chunk siguiente SIN título.
+        // En los instructivos cada "### Paso N — …" quedaba separado de su
+        // instrucción: el LLM recibía pasos sin número (errores de secuencia),
+        // "Desinfecte los guantes antes de ingresar" quedaba pegado a
+        // "## Procedimiento de Salida" (mezcla ingreso/salida en área gris) y
+        // "no retirarse la cofia" quedaba separado de "Paso 10 — Al Salir".
+        // Además sectionTitle tomaba el ÚLTIMO título visto (desfasado un chunk:
+        // el chunk con el texto de la Misión quedaba etiquetado "Principios y
+        // Valores"). Ahora:
+        //   - un HEADER nunca es el último bloque de un chunk: viaja al chunk
+        //     siguiente junto con su cuerpo (también cadenas "## Sección" +
+        //     "### Paso 9");
+        //   - sectionTitle = la sección vigente al INICIO del chunk (o su primer
+        //     título, si el chunk empieza con uno).
         const chunks = [];
         let currentChunk = [];
         let currentLen   = 0;
         let currentSection = '';
+        let chunkStartSection = '';
+
+        const headerTitle = (b) => b.text.replace(/^#+\s*/, '').replace(/[-─═]+/g, '').trim().substring(0, 80);
 
         const flushChunk = () => {
             if (currentChunk.length === 0) return;
             const chunkText = currentChunk.map(b => b.text).join('\n\n');
             if (chunkText.trim().length >= MIN_CHUNK_LEN) {
+                const firstReal = currentChunk.find(b => !b._isOverlap);
                 chunks.push({
                     text:         chunkText.trim(),
-                    sectionTitle: currentSection,
+                    sectionTitle: firstReal && firstReal.type === 'HEADER' ? headerTitle(firstReal) : chunkStartSection,
                     blockTypes:   currentChunk.map(b => b.type),
                 });
             }
@@ -120,70 +129,99 @@ class IngestionService {
             currentLen   = 0;
         };
 
-        for (let i = 0; i < classifiedBlocks.length; i++) {
-            const block   = classifiedBlocks[i];
-            const nextBlock = classifiedBlocks[i + 1];
-
-            // Actualizar título de sección actual
-            if (block.type === 'HEADER') {
-                currentSection = block.text.replace(/^#+\s*/, '').replace(/[-─═]+/g, '').trim().substring(0, 80);
+        // Saca los HEADER que quedaron al final del chunk actual para que
+        // viajen con su cuerpo al chunk siguiente.
+        const popTrailingHeaders = () => {
+            const carry = [];
+            while (currentChunk.length > 0 && currentChunk[currentChunk.length - 1].type === 'HEADER') {
+                const h = currentChunk.pop();
+                currentLen -= h.length;
+                carry.unshift(h);
             }
+            return carry;
+        };
 
-            // Regla 1: NUNCA separar HEADER de su bloque siguiente
-            const headerWithNext = (block.type === 'HEADER' && nextBlock);
+        const startChunkWith = (blocks) => {
+            chunkStartSection = currentSection;
+            for (const b of blocks) {
+                currentChunk.push(b);
+                currentLen += b.length;
+            }
+        };
+
+        for (let i = 0; i < classifiedBlocks.length; i++) {
+            const block     = classifiedBlocks[i];
+            const nextBlock = classifiedBlocks[i + 1];
 
             // Regla 2: NUNCA cortar a la mitad una LISTA o TABLE
             const isAtomicBlock = (block.type === 'LIST' || block.type === 'TABLE');
 
             // ── ¿Cabe el bloque en el chunk actual? ──────────────────────
-            const wouldExceed = (currentLen + block.length) > CHUNK_SIZE;
+            // Un HEADER se evalúa junto con su bloque siguiente (Regla 1): si
+            // ambos no caben, se corta ANTES del título.
+            const needed = block.type === 'HEADER' && nextBlock && nextBlock.type !== 'HEADER'
+                ? block.length + Math.min(nextBlock.length, CHUNK_SIZE)
+                : block.length;
+            const wouldExceed = (currentLen + needed) > CHUNK_SIZE;
 
-            if (wouldExceed && currentChunk.length > 0 && !headerWithNext) {
-                // Antes de vaciar, guardar overlap: último bloque del chunk actual
+            if (wouldExceed && currentChunk.length > 0) {
+                const carry        = popTrailingHeaders();
                 const overlapBlock = currentChunk[currentChunk.length - 1];
+                // Título que encabeza al bloque de overlap (si lo precede
+                // directamente): el overlap viaja CON su título, para no dejar
+                // un párrafo huérfano al inicio del chunk nuevo (ej. "Desinfecte
+                // los guantes antes de ingresar" sin "Paso 8", pegado a
+                // "## Procedimiento de Salida").
+                const overlapHeader = currentChunk.length >= 2 && currentChunk[currentChunk.length - 2].type === 'HEADER'
+                    ? currentChunk[currentChunk.length - 2]
+                    : null;
                 flushChunk();
 
-                // Iniciar nuevo chunk con el overlap del anterior (solo si es párrafo corto)
-                if (overlapBlock && overlapBlock.type === 'PARAGRAPH' && overlapBlock.length <= CHUNK_OVERLAP) {
-                    currentChunk = [{ ...overlapBlock, _isOverlap: true }];
-                    currentLen   = overlapBlock.length;
+                if (carry.length > 0) {
+                    // El chunk nuevo empieza con sus títulos (sin overlap: el
+                    // título ya da el contexto).
+                    startChunkWith(carry);
+                } else if (block.type !== 'HEADER' && overlapBlock && overlapBlock.type === 'PARAGRAPH' && overlapBlock.length <= CHUNK_OVERLAP) {
+                    // Overlap del anterior (solo párrafo corto y solo si el
+                    // chunk nuevo no empieza con un título propio).
+                    startChunkWith([
+                        ...(overlapHeader ? [{ ...overlapHeader, _isOverlap: true }] : []),
+                        { ...overlapBlock, _isOverlap: true },
+                    ]);
                 }
             }
 
+            // Actualizar título de sección DESPUÉS del posible flush, para que
+            // el chunk que se cierra conserve su propia sección.
+            if (block.type === 'HEADER') {
+                currentSection = headerTitle(block);
+            }
+
+            if (currentChunk.length === 0) chunkStartSection = currentSection;
             currentChunk.push(block);
             currentLen += block.length;
 
             // Si el bloque es muy grande por sí solo, forzar fragmentación
             if (block.length > CHUNK_SIZE) {
-                if (isAtomicBlock) {
-                    // Fragmentar la lista internamente respetando items
-                    const subChunks = this._splitLargeList(block.text);
-                    currentChunk.pop();
-                    currentLen -= block.length;
-                    flushChunk();
+                currentChunk.pop();
+                currentLen -= block.length;
+                // Los títulos que precedían al bloque se anteponen al primer
+                // fragmento en vez de quedar huérfanos (o descartados por MIN_CHUNK_LEN).
+                const carry = popTrailingHeaders();
+                flushChunk();
 
-                    for (const sub of subChunks) {
-                        chunks.push({
-                            text:         sub,
-                            sectionTitle: currentSection,
-                            blockTypes:   ['LIST_FRAGMENT'],
-                        });
-                    }
-                } else {
-                    // Fragmentar un párrafo enorme cortando por punto o salto de línea
-                    const subChunks = this._splitLargeParagraph(block.text);
-                    currentChunk.pop();
-                    currentLen -= block.length;
-                    flushChunk();
-                    
-                    for (const sub of subChunks) {
-                        chunks.push({
-                            text:         sub,
-                            sectionTitle: currentSection,
-                            blockTypes:   ['PARAGRAPH_FRAGMENT'],
-                        });
-                    }
-                }
+                const subChunks = isAtomicBlock
+                    ? this._splitLargeList(block.text)                 // respeta items
+                    : this._splitLargeParagraph(block.text);           // corta por punto
+                const prefix = carry.map(h => h.text).join('\n\n');
+
+                subChunks.forEach((sub, idx) => {
+                    chunks.push({
+                        text:         idx === 0 && prefix ? `${prefix}\n\n${sub}` : sub,
+                        sectionTitle: currentSection,
+                        blockTypes:   [isAtomicBlock ? 'LIST_FRAGMENT' : 'PARAGRAPH_FRAGMENT'],
+                    });
+                });
             }
         }
 
@@ -244,7 +282,13 @@ class IngestionService {
             const lines      = trimmedUnit.split('\n');
             const headerLine = lines[0].trim();
             const headerText = headerLine.replace(/^#+\s*/, '').trim();
-            const body        = lines.slice(1).join('\n').trim();
+            // (2026-10-08) Los encabezados de CAPÍTULO que preceden al artículo
+            // siguiente quedaban como cola de este ("…ARTICULO 22 … ## CAPITULO
+            // VII DESCANSO OBLIGATORIO"), sugiriendo al LLM que el tema del
+            // capítulo siguiente pertenece a este artículo. Se quitan de la cola.
+            const body        = lines.slice(1).join('\n').trim()
+                .replace(/(\n+\s*#{1,6}\s+[^\n]*)+\s*$/, '')
+                .trim();
 
             if (!body) {
                 chunks.push({ text: headerText, sectionTitle: headerText.substring(0, 80), blockTypes: ['ARTICLE_HEADER_ONLY'] });
@@ -303,7 +347,17 @@ class IngestionService {
             len += u.length + 2;
         }
         if (current.length > 0) groups.push(current.join('\n\n'));
-        return groups;
+
+        // (2026-10-08) Un ítem individual más grande que el límite (ej. un
+        // numeral de 4.000 chars en el Art. 47 o el procedimiento del Art. 99,
+        // 8.156 chars) quedaba como un solo fragmento — muy por encima de lo
+        // que el modelo de embeddings representa bien. Se subdivide por
+        // oraciones; el llamador sigue anteponiendo el "ARTÍCULO N" a cada uno.
+        // Primero por líneas (no separa un numeral "2." de su texto) y solo si
+        // una línea sigue siendo enorme, por oraciones.
+        return groups.flatMap(g => g.length <= maxLen * 1.5
+            ? [g]
+            : this._splitTextByDelimiter(g, '\n').flatMap(p => p.length > maxLen * 1.5 ? this._splitLargeParagraph(p) : [p]));
     }
 
     /**
@@ -440,10 +494,7 @@ class IngestionService {
             await qdrantService.createCollectionIfNotExists();
 
             const allFiles = await fs.readdir(DOCS_DIR);
-            const files    = allFiles.filter(f =>
-                (f.endsWith('.pdf') || f.endsWith('.txt') || f.endsWith('.md')) &&
-                !EXCLUDED_FILES.has(f)
-            );
+            const files    = allFiles.filter(isCorpusFile);
 
             console.log(`📂 Documentos encontrados: ${files.length}`);
             console.log(`   PDFs: ${files.filter(f => f.endsWith('.pdf')).length}`);
@@ -495,7 +546,16 @@ class IngestionService {
                 if (ocrUsed) totalOCR++;
 
                 // ── Semantic Chunking ─────────────────────────────────────
-                const semanticChunks = this._semanticChunking(text);
+                // Documentos con estructura de artículos numerados (RIT) usan el
+                // chunking header-aware por artículo. (2026-10-08) Antes el
+                // pipeline principal SIEMPRE usaba el genérico: los chunks del RIT
+                // en producción venían de scratch/build_rit_test_collection.mjs,
+                // y un rebuild_rag.js los habría regenerado sin el "ARTICULO N"
+                // en cada fragmento.
+                const articleHeaders = (text.match(/^#{1,4}\s*ART[IÍ]CULO[S]?\.?\s+\d+/gim) || []).length;
+                const semanticChunks = articleHeaders >= 5
+                    ? this._semanticChunkingByArticle(text)
+                    : this._semanticChunking(text);
                 console.log(`   ✂️  Chunks: ${semanticChunks.length} | Estrategia: ${strategy} | OCR: ${ocrUsed ? 'SÍ' : 'NO'}`);
 
                 if (semanticChunks.length === 0) {

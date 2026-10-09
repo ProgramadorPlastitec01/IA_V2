@@ -101,6 +101,35 @@ class DatabaseService {
                 ON knowledge_base(question_normalized)
             `);
 
+            // ── Buzón de sugerencias y calificación de respuestas (kiosco 2026-10) ──
+            await this.db.exec(`
+                CREATE TABLE IF NOT EXISTS suggestions (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type        TEXT    NOT NULL,
+                    message     TEXT    NOT NULL,
+                    name        TEXT    DEFAULT NULL,
+                    area        TEXT    DEFAULT NULL,
+                    status      TEXT    DEFAULT 'nuevo',
+                    client_ip   TEXT    DEFAULT NULL,
+                    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            await this.db.exec(`CREATE INDEX IF NOT EXISTS idx_suggestions_created ON suggestions(created_at)`);
+
+            await this.db.exec(`
+                CREATE TABLE IF NOT EXISTS answer_ratings (
+                    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    rating           TEXT    NOT NULL,
+                    question         TEXT    NOT NULL,
+                    answer           TEXT    DEFAULT NULL,
+                    sources          TEXT    DEFAULT NULL,
+                    conversation_id  TEXT    DEFAULT NULL,
+                    client_ip        TEXT    DEFAULT NULL,
+                    created_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            await this.db.exec(`CREATE INDEX IF NOT EXISTS idx_ratings_created ON answer_ratings(created_at)`);
+
             console.log(`✅ SQLite Cache Database inicializada en: ${DB_PATH}`);
         } catch (error) {
             console.error('❌ Error inicializando SQLite:', error.message);
@@ -441,6 +470,62 @@ class DatabaseService {
 
     async cleanup() {
         return this._runCleanupIfNeeded();
+    }
+
+    // ── Buzón de sugerencias ────────────────────────────────────────────
+
+    /**
+     * @param {{type:string, message:string, name?:string|null, area?:string|null, clientIp?:string|null}} s
+     * @returns {Promise<number>} id del registro insertado
+     */
+    async saveSuggestion({ type, message, name = null, area = null, clientIp = null }) {
+        if (!this.db) throw new Error('DB no inicializada');
+        const result = await this.db.run(
+            `INSERT INTO suggestions (type, message, name, area, client_ip) VALUES (?, ?, ?, ?, ?)`,
+            [type, message, name, area, clientIp]
+        );
+        return result.lastID;
+    }
+
+    async listSuggestions(limit = 100) {
+        if (!this.db) return [];
+        return this.db.all(
+            `SELECT id, type, message, name, area, status, created_at
+             FROM suggestions ORDER BY id DESC LIMIT ?`,
+            [limit]
+        );
+    }
+
+    // ── Calificación de respuestas ──────────────────────────────────────
+
+    /**
+     * @param {{rating:'good'|'neutral'|'bad', question:string, answer?:string|null, sources?:string[], conversationId?:string|null, clientIp?:string|null}} r
+     * @returns {Promise<number>} id del registro insertado
+     */
+    async saveRating({ rating, question, answer = null, sources = [], conversationId = null, clientIp = null }) {
+        if (!this.db) throw new Error('DB no inicializada');
+        const result = await this.db.run(
+            `INSERT INTO answer_ratings (rating, question, answer, sources, conversation_id, client_ip)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [rating, question, answer, JSON.stringify(sources || []), conversationId, clientIp]
+        );
+        return result.lastID;
+    }
+
+    async getRatingStats(recentLimit = 50) {
+        if (!this.db) return { totals: [], recent: [] };
+        const [totals, recent] = await Promise.all([
+            this.db.all(`SELECT rating, COUNT(*) as count FROM answer_ratings GROUP BY rating`),
+            this.db.all(
+                `SELECT id, rating, question, answer, sources, created_at
+                 FROM answer_ratings ORDER BY id DESC LIMIT ?`,
+                [recentLimit]
+            )
+        ]);
+        return {
+            totals,
+            recent: recent.map(r => ({ ...r, sources: (() => { try { return JSON.parse(r.sources || '[]'); } catch { return []; } })() }))
+        };
     }
 }
 

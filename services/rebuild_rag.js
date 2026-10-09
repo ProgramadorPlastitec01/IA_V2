@@ -162,7 +162,9 @@ async function createCollection() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        vectors: { size: vectorSize, distance: 'Cosine' }
+        vectors: { size: vectorSize, distance: 'Cosine' },
+        // Sin optimizador: en Windows el rename de segmentos falla ("Acceso denegado", os error 5).
+        optimizers_config: { max_optimization_threads: 0 }
       })
     });
     if (!res.ok) {
@@ -312,7 +314,30 @@ async function main() {
   console.log('╚══════════════════════════════════════════════════════╝\n');
 }
 
-main().catch(err => {
-  console.error('\n❌ Error fatal en rebuild_rag.js:', err.message);
-  process.exit(1);
-});
+// ── Protección (2026-10-08) ──────────────────────────────────────────────────
+// Antes, main() corría al IMPORTAR el módulo: un simple `import('./rebuild_rag.js')`
+// (p. ej. para verificar que el código carga) vaciaba la colección de producción.
+// Ahora: (1) solo se ejecuta si se invoca directamente con node, y (2) exige el
+// flag --confirmar, mostrando antes qué colección va a vaciar.
+//   node services/rebuild_rag.js              → solo muestra el plan, no toca nada
+//   node services/rebuild_rag.js --confirmar  → ejecuta
+const invokedDirectly = process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('services/rebuild_rag.js');
+
+if (invokedDirectly) {
+  if (!process.argv.includes('--confirmar')) {
+    fetch(`${QDRANT_URL}/collections/${COLLECTION}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const n = d?.result?.points_count ?? '(no existe)';
+        console.log(`\nrebuild_rag.js VACIARÁ y re-ingestará la colección "${COLLECTION}" (puntos actuales: ${n}).`);
+        console.log('Para ejecutarlo de verdad: node services/rebuild_rag.js --confirmar');
+        console.log('Para otra colección: $env:QDRANT_COLLECTION="nombre"; node services/rebuild_rag.js --confirmar\n');
+      })
+      .catch(() => console.log(`\nColección destino: "${COLLECTION}". Use --confirmar para ejecutar.\n`));
+  } else {
+    main().catch(err => {
+      console.error('\n❌ Error fatal en rebuild_rag.js:', err.message);
+      process.exit(1);
+    });
+  }
+}

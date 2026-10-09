@@ -53,6 +53,22 @@ const HelpGuide = ({ isOpen, onClose }) => {
                             </p>
                         </section>
 
+                        {/* Una pregunta a la vez (no es un chat con memoria) */}
+                        <section className="rounded-3xl p-6 border" style={{ background: 'var(--color-cat-amber-fill)', borderColor: 'var(--color-cat-amber)' }}>
+                            <h3 className="text-sm font-medium uppercase tracking-[0.2em] mb-3 flex items-center gap-2" style={{ color: 'var(--color-cat-amber)' }}>
+                                <span>☝️</span> Una pregunta a la vez
+                            </h3>
+                            <p className="text-ink font-normal leading-relaxed">
+                                El asistente <strong className="font-medium">no es un chat</strong>: no recuerda tu pregunta anterior.
+                                Si tienes otra duda, escríbela completa como una pregunta nueva.
+                            </p>
+                            <p className="text-sm mt-3 text-ink">
+                                <span className="line-through text-muted">"¿Y si es mi hijo?"</span>
+                                <span className="mx-2">→</span>
+                                <span>"Si mi hijo se enferma, ¿puedo pedir permiso para cuidarlo?"</span>
+                            </p>
+                        </section>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Bien formuladas */}
                             <section className="rounded-3xl p-6 border" style={{ background: 'var(--color-cat-teal-fill)', borderColor: 'var(--color-cat-teal)' }}>

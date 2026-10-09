@@ -31,6 +31,7 @@ import retrievalConfidence from './retrievalConfidence.js';
 import { cleanResponse, polarityAwareClean } from '../utils/textProcessor.js';
 import responseTypeResolver from './responseTypeResolver.js';
 import responseBuilderService from './responseBuilderService.js';
+import citationValidator from './citationValidator.js';
 import { SYSTEM_MESSAGES } from '../config/systemMessages.js';
 
 // ─── Vocabulario conocido para detección de gibberish ─────────────────────
@@ -368,7 +369,7 @@ class RagService {
             const intent         = intentRoutingService.detectIntent(query);
             const intentParams   = intentRoutingService.getParams(intent);
             
-            const { expanded_query, expanded_terms, normalizedTerms } = queryUnderstandingService.understand(query);
+            const { expanded_query, expanded_terms, normalizedTerms, interpretation_hints = [] } = queryUnderstandingService.understand(query);
 
             // spellCorrectedQuery: query con typos corregidos, usada para todo lo que
             // compara contra el texto canónico del corpus: Embedding primario, keywords,
@@ -403,7 +404,14 @@ class RagService {
             if (spellCorrectedQuery !== query) {
                 console.log(`[Embedding] Usando query normalizada: "${query}" → "${spellCorrectedQuery}"`);
             }
-            const originalQueryEmbedding = await embeddingsService.generateEmbedding(spellCorrectedQuery);
+            // (2026-10-08) Si se reconoció jerga (interpretation_hints), el modelo
+            // de embeddings no sabe qué es "mi cucha" o "me echaron": el canal
+            // semántico principal usa también la query expandida con los
+            // términos de los documentos. Sin esto "mi cucha está enferma,
+            // ¿puedo faltar?" daba similarity 0.33 → confidence 0.189 < 0.20 →
+            // "No encontré información", aunque la expansión era correcta.
+            const primaryEmbeddingText = interpretation_hints.length > 0 ? expanded_query : spellCorrectedQuery;
+            const originalQueryEmbedding = await embeddingsService.generateEmbedding(primaryEmbeddingText);
             const expandedQueryEmbedding = await embeddingsService.generateEmbedding(expanded_query);
             metrics.embedding_ms  = Date.now() - startEmbedding;
 
@@ -417,7 +425,13 @@ class RagService {
             const startRetrieval = Date.now();
             const topK = intentParams.topK || 20;
 
-            const cleanKeywordQuery = expanded_terms.length > 0 ? expanded_terms.join(' ') : keywords.join(' ');
+            // BUG CORREGIDO (2026-10-08): si había expansión, BM25 buscaba SOLO
+            // los términos expandidos y descartaba las palabras del usuario.
+            // Caso real: "si mi hijo se enferma, puedo tomar esto como
+            // incapacidad" → BM25 buscó "tomar alcohol embriaguez sustancias
+            // psicoactivas" sin "hijo/enferma/incapacidad". Ahora se usan las
+            // keywords de la query MÁS la expansión (sin duplicados).
+            const cleanKeywordQuery = [...new Set([...keywords, ...expanded_terms])].join(' ');
             
             const [semanticResults, expandedSemanticResults, keywordResults, exactPhraseResults] = await Promise.all([
                 qdrantService.searchSimilar(originalQueryEmbedding, topK),
@@ -587,10 +601,21 @@ class RagService {
             // ("lisencia", "acidentes lavorales") nunca matcheara el vocabulario
             // aunque la corrección ortográfica ya lo hubiera arreglado para el
             // resto del pipeline, rechazando la pregunta antes del retrieval.
+            // (2026-10-08) Excepción por similitud alta: preguntas del dominio
+            // cuyo vocabulario no está en la lista curada se rechazaban aunque
+            // el retrieval fuera excelente. Caso TI BPM-5 ("¿Cómo se debe
+            // realizar una corrección en un registro?") tenía similarity=0.944
+            // y se respondía "No encontré información"; igual D7 "¿A quién le
+            // aviso si me accidento?" (0.603) y E10 "Reporte de ARL." (0.659).
+            // Calibración (benchmark_100 + 12 fuera de dominio, colección p0):
+            // fuera de dominio y trampas de categoría C ≤ 0.537; preguntas
+            // válidas sin vocabulario ≥ 0.603. Umbral 0.60.
+            const TOPICAL_SIMILARITY_BYPASS = 0.60;
             const hasTopicalSignal = expanded_terms.length > 0
                 || foundAcronyms.length > 0
                 || docPriority.boost.length > 0
-                || this._hasHRDomainToken(spellCorrectedQuery);
+                || this._hasHRDomainToken(spellCorrectedQuery)
+                || rawConfidence >= TOPICAL_SIMILARITY_BYPASS;
 
             if (!contextText || chunksUsed === 0 || safeConfidence < 0.20 || isEntityHallucination || !hasTopicalSignal) {
                 const noContextResp = {
@@ -646,9 +671,42 @@ class RagService {
             let finalResponse;
 
             try {
-                const { jsonFacts, citations } = await llmService.generateRAGResponse(query, contextText, session, confidence, sources);
-                const builtText = responseBuilderService.build(jsonFacts, responseType);
-                finalResponse = builtText + citations;
+                const { jsonFacts, citations } = await llmService.generateRAGResponse(query, contextText, session, confidence, sources, interpretation_hints);
+                let builtText = responseBuilderService.build(jsonFacts, responseType);
+                let finalCitations = citations;
+
+                // ── Validación post-generación (2026-10-08) ──────────────────
+                // Solo sobre respuestas con contenido (no sobre rechazos).
+                // Corrige citas de artículo/ley sin respaldo en el contexto,
+                // nombres de archivo filtrados y códigos I-RH ajenos a las
+                // fuentes; y detecta premisas no respaldadas (término de la
+                // pregunta que la respuesta repite y no existe en ningún
+                // documento — ej. "cumpleaños").
+                if (!jsonFacts?.error) {
+                    const v = citationValidator.validate(builtText, contextText, sources, spellCorrectedQuery);
+                    if (v.changes.length > 0) {
+                        console.log(`[CitationValidator] ${v.changes.length} corrección(es): ${v.changes.map(c => `"${c.from}" → "${c.to}"`).join(' | ')}`);
+                    }
+                    builtText = v.text;
+                    if (v.echoOnly) {
+                        // La respuesta era solo la copia del ejemplo del prompt.
+                        console.log(`[CitationValidator] Respuesta = eco del ejemplo del prompt → sin información | query="${query}"`);
+                        builtText = SYSTEM_MESSAGES.INSUFFICIENT_CONTEXT;
+                        finalCitations = '';
+                    } else if (v.unsupportedTerms.length > 0) {
+                        const p = citationValidator.applyPremiseCheck(
+                            builtText, v.unsupportedTerms,
+                            SYSTEM_MESSAGES.UNSUPPORTED_PREMISE_PREFIX, SYSTEM_MESSAGES.UNSUPPORTED_PREMISE_SUFFIX
+                        );
+                        if (p.removed > 0) {
+                            console.log(`[CitationValidator] Premisa no respaldada: [${v.unsupportedTerms.join(', ')}] — ${p.replacedAll ? 'respuesta reemplazada' : `${p.removed} oración(es) quitada(s)`} | query="${query}"`);
+                        }
+                        builtText = p.text;
+                        if (p.replacedAll) finalCitations = '';
+                    }
+                }
+
+                finalResponse = builtText + finalCitations;
             } catch (err) {
                 console.error(`   ❌ LLM primario falló: ${err.message}.`);
                 finalResponse = "Lo siento, hubo un problema técnico extrayendo la información solicitada.";
@@ -707,6 +765,55 @@ class RagService {
 
     _detectDocPriority(query) {
         const lower = query.toLowerCase();
+
+        // ── Área única (2026-10-08) ───────────────────────────────────────────
+        // La regla de "Ingreso a áreas" del mapa subía por igual I-RH-009/010/011
+        // con mencionar cualquier área. Sus textos son casi idénticos ("Póngase
+        // la blusa blanca", "Quítese la ropa de calle"), así que en una pregunta
+        // de área GRIS los chunks de blancas/negras quedaban arriba y el de
+        // grises fuera del top-6 (prueba TI GRI-1: "según el instructivo
+        // I-RH-009" → I-RH-009 ni siquiera entró al contexto). Causa de la
+        // mezcla de procedimientos entre áreas (blusa blanca en áreas negras,
+        // pasos de grises respondidos como de negras). Si la pregunta nombra
+        // EXACTAMENTE un área (o su código), se sube solo ese instructivo y se
+        // bajan los otros dos. Con varias áreas o ninguna → reglas de siempre.
+        const AREA_DOCS = [
+            { doc: 'i-rh-009', re: /(?<![\p{L}\p{N}])(i-?rh-?0?09|(?:[aá]reas?|zonas?)\s+gris(?:es)?)(?![\p{L}\p{N}])/iu },
+            { doc: 'i-rh-010', re: /(?<![\p{L}\p{N}])(i-?rh-?0?10|(?:[aá]reas?|zonas?)\s+negras?)(?![\p{L}\p{N}])/iu },
+            { doc: 'i-rh-011', re: /(?<![\p{L}\p{N}])(i-?rh-?0?11|(?:[aá]reas?|zonas?)\s+blancas?)(?![\p{L}\p{N}])/iu },
+        ];
+        const areasHit = AREA_DOCS.filter(a => a.re.test(lower));
+        if (areasHit.length === 1) {
+            const target = areasHit[0].doc;
+            return {
+                boost:    [target],
+                penalize: AREA_DOCS.map(a => a.doc).filter(d => d !== target),
+            };
+        }
+
+        // ── Documento nombrado por su título (2026-10-08) ─────────────────────
+        // DOC_PRIORITY_MAP es "primera coincidencia gana" y tiene reglas muy
+        // amplias antes que las específicas: 'plastitec' (regla corporativa)
+        // subía el documento de Conocimiento en CUALQUIER pregunta que dijera
+        // PLASTITEC — incluidas las del Código de Ética—, y 'lavado' subía el
+        // BPM antes que el propio instructivo de Lavado de Manos (prueba TI
+        // LAV-1: el chunk de "Alcance" de I-RH-012 quedaba fuera). Si la
+        // pregunta nombra EXACTAMENTE un documento por su título, se sube ese.
+        const TITLE_DOCS = [
+            // El BPM repite texto genérico de lavado ("el instructivo está expuesto
+            // en todos los lugares…") que el LLM tomaba en vez del alcance real.
+            { doc: 'i-rh-012',      re: /lavado\s+de\s+(las\s+)?manos/, penalize: ['bpm'] },
+            { doc: 'i-rh-017',      re: /c[oó]digo\s+de\s+[eé]tica/ },
+            { doc: 'i-rh-003',      re: /buenas\s+pr[aá]cticas\s+de\s+manufactura|(?<![\p{L}])bpm(?![\p{L}])|i-?rh-?0?03(?![\d])/u },
+            { doc: 'i-rh-006',      re: /visitas?\s+(a\s+la\s+)?planta\s*2|i-?rh-?0?06(?![\d])/ },
+            { doc: 'i-rh-004',      re: /inducci[oó]n\s+(en\s+)?(sst|seguridad)|i-?rh-?0?04(?![\d])/ },
+            { doc: 'rit_plastitec', re: /reglamento\s+interno|(?<![\p{L}])rit(?![\p{L}])/u },
+        ];
+        const titlesHit = TITLE_DOCS.filter(t => t.re.test(lower));
+        if (titlesHit.length === 1) {
+            return { boost: [titlesHit[0].doc], penalize: titlesHit[0].penalize || [] };
+        }
+
         for (const rule of DOC_PRIORITY_MAP) {
             if (rule.keywords.some(k => lower.includes(k))) {
                 return { boost: rule.boostDocs, penalize: rule.penalizeDocs };

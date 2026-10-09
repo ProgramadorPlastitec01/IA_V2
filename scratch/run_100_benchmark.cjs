@@ -14,7 +14,9 @@ const os = require('os');
 const modelName = process.argv[2] || 'unknown_model';
 const BENCHMARK_FILE = path.join(__dirname, 'benchmark_100.json');
 const RESULTS_FILE = path.join(__dirname, `../reports/benchmark_raw_results_${modelName.replace(/[:.]/g, '_')}.json`);
-const API_URL = 'http://localhost:3000/api/query';
+// BENCH_API_URL permite correr el benchmark contra una instancia aparte
+// (p. ej. puerto 3999) sin levantar el backend en el puerto de los kioscos.
+const API_URL = process.env.BENCH_API_URL || 'http://localhost:3000/api/query';
 
 const REJECT_MESSAGES = [
     "No encontré información sobre este tema en la documentación disponible.",

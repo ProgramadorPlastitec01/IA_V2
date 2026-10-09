@@ -20,6 +20,7 @@ import chatRoutes from './routes/chatRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
+import feedbackRoutes from './routes/feedbackRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -56,6 +57,7 @@ app.use('/api', chatRoutes);
 app.use('/api', analyticsRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', systemRoutes);
+app.use('/api', feedbackRoutes);
 
 // --- SPA FALLBACK ---
 app.get(/\/AsistenteRRHH($|\/.*)/, (req, res, next) => {

@@ -1,0 +1,8 @@
+{"i":133,"cls":"CORRECTA","cmp":"igual","cause":"","note":"Art.44 y aclara que no se especifica la fecha de pago (no está en los docs)."}
+{"i":134,"cls":"CORRECTA","cmp":"igual","cause":"","note":"Art.40 (época la señala la empresa a más tardar dentro del año subsiguiente). Podría añadir el aviso con 15 días de anticipación."}
+{"i":135,"cls":"PARCIAL","cmp":"igual","cause":"prompt/LLM","note":"'Cuánto están' = porcentajes. Da los límites (art.31) y el inicio del nocturno, pero no los recargos del art.33 (nocturno 35%, extra diurna 25%, extra nocturna 75%)."}
+{"i":136,"cls":"CORRECTA","cmp":"igual","cause":"citación","note":"19:00 correcto. La franja está en el art.29; el art.33 (que cita) trata de las tasas. Error menor de citación."}
+{"i":137,"cls":"INCORRECTA","cmp":"igual","cause":"prompt/LLM","note":"Inventa que 'se menciona la posibilidad de acordar beneficios para los temporales'. Los docs no hablan de temporales. Conf 0.34."}
+{"i":138,"cls":"NO RESPONDE CORRECTAMENTE","cmp":"mejoró","cause":"","note":"Premisa sin respaldo bien detectada (cumpleaños). OLD alucinaba un día libre según el art.35."}
+{"i":139,"cls":"INCORRECTA","cmp":"empeoró","cause":"prompt/LLM","note":"Aplica mal el art.35 par.1 (remuneración proporcional del dominical para jornadas parciales). Lo correcto: los festivos son de descanso obligatorio remunerado (art.35) y, si se trabajan, se pagan con recargo del 90% desde el 1-jul-2026 (par.3). OLD se acercaba más."}
+{"i":140,"cls":"INCORRECTA","cmp":"igual","cause":"retrieval (chunk obsoleto)+LLM","note":"Da los HORARIOS UNO/DOS derogados (8-1 / 7-1) como 'horario diurno'. Lo pertinente: jornada diurna de 6:00 a.m. a 7:00 p.m. (art.29) y el horario administrativo vigente de 7:30 a 5:00."}

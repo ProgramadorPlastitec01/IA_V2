@@ -56,7 +56,10 @@ class QdrantService {
                             size:     finalVectorSize,
                             distance: 'Cosine',
                         },
-                        optimizers_config: { default_segment_number: 2 },
+                        // max_optimization_threads: 0 → sin optimizador. En este Windows el rename de
+                        // segmentos falla con "Acceso denegado" (os error 5) y deja la colección en "red".
+                        // Con <1000 puntos la optimización no aporta rendimiento.
+                        optimizers_config: { default_segment_number: 2, max_optimization_threads: 0 },
                         hnsw_config:       { m: 16, ef_construct: 100 },
                     }),
                 });
@@ -78,7 +81,15 @@ class QdrantService {
      */
     async _ensureIndexes() {
         const indexDefs = [
-            // Full-text index para búsqueda léxica en contenido
+            // Full-text index para búsqueda léxica en contenido.
+            // ascii_folding (2026-10-08): sin él, el índice guarda "dotación" con
+            // tilde mientras _tokenizeQuery envía "dotacion" sin tilde → el canal
+            // BM25 NUNCA encontraba palabras acentuadas (dotación: 23 chunks en
+            // el corpus, 0 coincidencias; certificación 5→0; corrección 3→0).
+            // Con folding, "dotacion" y "dotación" coinciden en ambos sentidos.
+            // Requiere Qdrant ≥ 1.15. Ojo: si el índice ya existe, este PUT no
+            // cambia sus parámetros — hay que borrarlo y recrearlo (ver
+            // scratch/recreate_text_index_2026-10-08.mjs).
             {
                 field_name:   'texto_original',
                 field_schema: {
@@ -87,6 +98,7 @@ class QdrantService {
                     min_token_len: 2,
                     max_token_len: 25,
                     lowercase:     true,
+                    ascii_folding: true,
                 },
             },
             // Keyword index para filtrar por archivo fuente
@@ -209,6 +221,13 @@ class QdrantService {
         const terms = this._tokenizeQuery(query);
         if (terms.length === 0) return [];
 
+        // (2026-10-08) Plural → singular: el índice full-text compara tokens
+        // exactos, así que "certificaciones" no encontraba "certificación" ni
+        // "normas" a "norma" (caso TI CON-2). Se filtra por ambas formas y se
+        // puntúa con la forma singular (que, como subcadena, cubre el plural).
+        const scoreTerms  = terms.map(t => this._singular(t) || t);
+        const filterTerms = [...new Set([...terms, ...scoreTerms])];
+
         return await this._withRetry(async () => {
             // Buscar con todos los términos como match de texto
             const fullQuery = terms.join(' ');
@@ -220,7 +239,7 @@ class QdrantService {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         filter: {
-                            should: terms.map(t => ({
+                            should: filterTerms.map(t => ({
                                 key:   'texto_original',
                                 match: { text: t },
                             })),
@@ -251,7 +270,7 @@ class QdrantService {
                 let matchCount = 0;
                 let termScore  = 0;
 
-                for (const term of terms) {
+                for (const term of scoreTerms) {
                     const termNorm = term.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                     // Contar ocurrencias del término
                     const occurrences = (textNorm.match(new RegExp(termNorm, 'g')) || []).length;
@@ -470,6 +489,22 @@ class QdrantService {
      * Tokeniza una query para búsqueda léxica.
      * Elimina stopwords y palabras muy cortas.
      */
+    /**
+     * Forma singular aproximada de un token ya normalizado (minúsculas, sin
+     * tildes). Devuelve null si no parece plural. Reglas conservadoras del
+     * español: -ciones→-cion, -siones→-sion, -dades→-dad, consonante+es→sin
+     * "es" (mujeres→mujer, normales→normal), vocal+s→sin "s" (normas→norma).
+     */
+    _singular(t) {
+        if (!t || t.length < 5) return null;
+        if (t.endsWith('ciones')) return t.slice(0, -6) + 'cion';
+        if (t.endsWith('siones')) return t.slice(0, -6) + 'sion';
+        if (t.endsWith('dades'))  return t.slice(0, -5) + 'dad';
+        if (/[lrndj]es$/.test(t) && t.length > 5) return t.slice(0, -2);
+        if (/[aeiou]s$/.test(t)) return t.slice(0, -1);
+        return null;
+    }
+
     _tokenizeQuery(query) {
         const STOPWORDS = new Set([
             'cual', 'cuales', 'como', 'que', 'son', 'los', 'las', 'para',

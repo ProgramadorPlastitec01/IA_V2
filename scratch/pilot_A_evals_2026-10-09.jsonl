@@ -1,0 +1,150 @@
+{"i":0,"ids0":57,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el art.40 estaba en el contexto (concesión oficiosa o a petición del trabajador; la empresa avisa con 15 días)."}
+{"i":1,"ids0":46,"cls":"CORRECTA","note":"Art.47 num.7: 5 días hábiles y parentescos. Sin la cita espuria de la Ley 2101."}
+{"i":2,"ids0":47,"cls":"PARCIAL","note":"Transcribe la excepción del art.81 num.31 (emergencias/descansos). Omite 'salvo autorización del jefe' y la prohibición BPM de ingresar/usar celular en áreas de proceso, que es lo pertinente para 'en la planta'."}
+{"i":3,"ids0":49,"cls":"PARCIAL","note":"Horario administrativo vigente correcto (viernes 4:30) y etiquetado como administrativo. Añade una frase inventada ('disponibles para responder requerimientos… por medios autorizados') y omite los turnos operativos."}
+{"i":4,"ids0":95,"cls":"CORRECTA","note":"Flujo completo del I-RH-004 (jefe/coordinador, brigadista, enfermería, ARL, centro médico, informar a RRHH)."}
+{"i":5,"ids0":121,"cls":"INCORRECTA/ALUCINACIÓN","note":"Sigue aplicando el art.61 (enfermedad DEL TRABAJADOR) a la incapacidad del hijo: 'debería ser considerado conforme al art.61'. Los docs no prevén licencia por enfermedad de un hijo."}
+{"i":6,"ids0":148,"cls":"CORRECTA","note":"Definición literal del I-RH-003."}
+{"i":7,"ids0":50,"cls":"INCORRECTA/ALUCINACIÓN","note":"Arranca bien (6 días hábiles, turnos por programación interna, art.39), pero luego da los HORARIOS UNO/DOS administrativos derogados (8-1, 2-5, viernes 4 PM) como horario de operarios."}
+{"i":8,"ids0":51,"cls":"NO RESPONDE CORRECTAMENTE","note":"El inicio y fin de cada turno no está en los docs: la abstención es aceptable. Podría haber dicho que la rotación es por disposición interna (sí estaba en el contexto)."}
+{"i":9,"ids0":52,"cls":"NO RESPONDE CORRECTAMENTE","note":"El horario de Producción Farmacéutica no está en los docs. Mejora frente a la base, que aplicaba el horario administrativo."}
+{"i":10,"ids0":53,"cls":"INCORRECTA/ALUCINACIÓN","note":"Disposición interna: correcto. Pero 'por ejemplo' presenta el HORARIO DOS administrativo derogado (7-1, 2-5, viernes 4 PM) como ejemplo de turno."}
+{"i":11,"ids0":54,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.101 (falta total sin excusa: suspensión hasta 8 días, luego hasta 2 meses) no llegó al contexto: falla de retrieval, el dato está en los docs."}
+{"i":12,"ids0":55,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los turnos no están en los docs. Mejora frente a la base, que inventaba 'art.101, tarde 2-5 PM'."}
+{"i":13,"ids0":56,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. Los 6 días hábiles del operativo (art.39 par.) no estaban en el contexto (retrieval), pero el dato existe en los docs."}
+{"i":14,"ids0":59,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el contexto traía 'ISO 9001 (BVQI)' e 'ISO 13485 (ICONTEC)'."}
+{"i":15,"ids0":62,"cls":"PARCIAL","note":"Da una responsabilidad real (art.65: informar el accidente de inmediato) y la segunda es vaga ('el texto no detalla…'). No usa los arts. 71/79."}
+{"i":16,"ids0":63,"cls":"INCORRECTA/ALUCINACIÓN","note":"Malinterpreta el art.35 num.3: inventa que el festivo trabajado se compensa con descanso en un día laborable. El recargo del 90% (par.3) no aparece."}
+{"i":17,"ids0":64,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs."}
+{"i":18,"ids0":65,"cls":"NO RESPONDE CORRECTAMENTE","note":"Abstención correcta. La base inventaba la clasificación LA/FT."}
+{"i":19,"ids0":66,"cls":"NO RESPONDE CORRECTAMENTE","note":"No hay permiso genérico para 'asuntos importantes' (el art.46 solo tasa casos, y no llegó al contexto). Mejor que la base, que inventaba una licencia remunerada."}
+{"i":20,"ids0":67,"cls":"CORRECTA","note":"Jornada flexible del art.23 par.5 b) transcrita bien; sin el eco de la plantilla."}
+{"i":21,"ids0":68,"cls":"NO RESPONDE CORRECTAMENTE","note":"El horario de operaria farmacéutica no está en los docs. Mejora frente a la base, que daba el HORARIO UNO derogado."}
+{"i":22,"ids0":69,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no distinguen a los temporales."}
+{"i":23,"ids0":70,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el contexto traía 'No usar maquillaje de ningún tipo' (BPM) y 'no ingresar con ningún tipo de maquillaje' (I-RH-006)."}
+{"i":24,"ids0":72,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.110 (causales de justa causa) no llegó al contexto, aunque sí el art.143 (faltas graves → terminación con justa causa). El dato está en los docs."}
+{"i":25,"ids0":74,"cls":"PARCIAL","note":"Cofia, cinta y desinfección de guantes: correcto, pero incompleto (sin definición ni higiene, prohibiciones, registros o PNC)."}
+{"i":26,"ids0":75,"cls":"CORRECTA","note":"Lista completa de beneficios del I-RH-001."}
+{"i":27,"ids0":76,"cls":"CORRECTA","note":"Lista completa de beneficios del I-RH-001."}
+{"i":28,"ids0":77,"cls":"INCORRECTA/ALUCINACIÓN","note":"Transcribe los HORARIOS UNO/DOS derogados (vigentes hasta el 13-jul-2026) como horario de los trabajadores, e inventa 'viernes 08:00 a 05:00'. Omite el horario vigente y los turnos. Conf 0.74."}
+{"i":29,"ids0":78,"cls":"INCORRECTA/ALUCINACIÓN","note":"Presenta los HORARIOS UNO/DOS administrativos derogados como horario de las operarias, y la respuesta queda truncada ('VIERNES: 04:')."}
+{"i":30,"ids0":79,"cls":"NO RESPONDE CORRECTAMENTE","note":"Crecimiento/ascensos no está en los docs. Corrige la fuga de la plantilla de la base."}
+{"i":31,"ids0":80,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs (lo más cercano es el art.93, evaluación de desempeño, que no llegó al contexto)."}
+{"i":32,"ids0":81,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los turnos de operarias no están en los docs. Mejora frente a la base (horario derogado)."}
+{"i":33,"ids0":82,"cls":"NO RESPONDE CORRECTAMENTE","note":"Consulta vacía: la abstención es aceptable (lo ideal sería NOT_UNDERSTOOD). Corrige la plantilla con conf 0.81 de la base."}
+{"i":34,"ids0":83,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. La clasificación de riesgos del I-RH-004 no llegó al contexto (retrieval), pero el dato existe."}
+{"i":35,"ids0":84,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.83 (metas de productividad por máquina, definidas por la empresa) no llegó al contexto (retrieval)."}
+{"i":36,"ids0":85,"cls":"NO RESPONDE PERO DEBERÍA","note":"Mismo NO_MATCH con conf 0 que la base (antes del LLM). El art.3 responde: término fijo máximo 4 años."}
+{"i":37,"ids0":86,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los horarios de los turnos PRF no están en los docs. Mejora frente a la base (aplicaba el horario administrativo)."}
+{"i":38,"ids0":89,"cls":"CORRECTA","note":"Cuatro áreas de proceso: Logística, Inyección, Extrusión y Producción Farmacéutica (I-RH-001)."}
+{"i":39,"ids0":90,"cls":"PARCIAL","note":"Cúpulas, mariposas, tapas, mezcla y peletizado: correcto. Pero añade 'se verifican con equipos de medición dimensional' (eso es de Gestión Calidad) y habla de 'productos farmacéuticos'."}
+{"i":40,"ids0":91,"cls":"CORRECTA","note":"Interpreta bien el art.40: la época la fija la empresa dentro del año subsiguiente, no necesariamente a fin de año."}
+{"i":41,"ids0":92,"cls":"PARCIAL","note":"Lista los festivos de descanso remunerado (art.35) y menciona el recargo, pero dice que 'no se especifica si se trabajan' y omite el 90% desde el 1-jul-2026."}
+{"i":42,"ids0":94,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. La regla 'ninguna ropa diferente a la dotación' no llegó al contexto, pero existe en los I-RH-009/010/011."}
+{"i":43,"ids0":102,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El derecho a conocer procedimientos e instructivos (I-RH-004) y los instructivos publicados en las áreas (BPM) existen en los docs, pero no llegaron al contexto."}
+{"i":44,"ids0":103,"cls":"CORRECTA","note":"Límites del art.31 más la autorización requerida (art.32 par.2)."}
+{"i":45,"ids0":104,"cls":"PARCIAL","note":"Dice bien que el recargo empieza a las 7 p.m., pero afirma que no encuentra hasta qué hora va. El contexto traía el art.29 (nocturno de 7:00 p.m. a 6:00 a.m.): omisión con el dato a la vista."}
+{"i":46,"ids0":105,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el contexto traía el art.39 par. (operativo: 6 días hábiles) y el art.24 (descanso del sábado)."}
+{"i":47,"ids0":106,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs."}
+{"i":48,"ids0":107,"cls":"PARCIAL","note":"Seguimiento sin contexto. Responde con el horario administrativo vigente (bien etiquetado), pero 'lunes a viernes 7:30-5:00' ignora que el viernes es hasta 4:30. Debió pedir aclaración."}
+{"i":49,"ids0":109,"cls":"NO RESPONDE CORRECTAMENTE","note":"Bloqueo de privacidad justificado (igual que la base)."}
+{"i":50,"ids0":110,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.39 (15 días hábiles por año de servicio) no llegó al contexto (retrieval)."}
+{"i":51,"ids0":112,"cls":"INCORRECTA/ALUCINACIÓN","note":"Presenta los HORARIOS UNO/DOS derogados como 'los dos horarios principales' de la empresa. Omite el vigente y los turnos. Empeora frente a la base (vaga pero no falsa)."}
+{"i":52,"ids0":113,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs. Mejora frente a la base, que inventaba la franja."}
+{"i":53,"ids0":114,"cls":"INCORRECTA/ALUCINACIÓN","note":"Presenta el horario ADMINISTRATIVO como horario del personal operativo (que va por turnos según el §22.2) y lo arma mal ('viernes mañana 7:30 a 4:30, almuerzo 1-2'). Conf 0.75. Empeora frente a la base."}
+{"i":54,"ids0":115,"cls":"CORRECTA","note":"Recargo dominical del 90% desde el 1-jul-2026, progresivo (art.35 par.3). Mejora frente a la base."}
+{"i":55,"ids0":116,"cls":"PARCIAL","note":"Convierte la pregunta en 'acoso sexual' y aplica el art.139. No menciona el Comité de Convivencia Laboral ni el trámite del art.136 para acoso laboral."}
+{"i":56,"ids0":117,"cls":"CORRECTA","note":"Jornada flexible del art.23 par.5 b) (por acuerdo, máx. 9 h/día, promedio 42 h, franja 6am-7pm). Corrige el rechazo indebido por premisa de la base."}
+{"i":57,"ids0":118,"cls":"PARCIAL","note":"Reduce el art.23 a la tabla de reducción de jornada (44 → 42 h). Omite horarios, turnos y descansos."}
+{"i":58,"ids0":119,"cls":"PARCIAL","note":"Bien que en los contratos fijos <1 año hay vacaciones proporcionales (art.45 par., citando la Ley 50/1990 art.3 par.), pero concluye 'sí puedes pedir vacaciones' cuando la norma habla del PAGO proporcional. El régimen general (art.39) exige 1 año."}
+{"i":59,"ids0":120,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no dicen si son obligatorias; solo que deben estar autorizadas (art.32 par.2). Abstención aceptable, mejor que el non sequitur de la base. Podía mencionar la autorización, que estaba en el contexto."}
+{"i":60,"ids0":122,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no clasifican el cargo de técnico. Mejora frente a la base, que lo suponía administrativo."}
+{"i":61,"ids0":123,"cls":"INCORRECTA/ALUCINACIÓN","note":"Llama 'personal operativo' al técnico de TI y le asigna una mezcla de los horarios derogados ('07:00 a 05:00 L-J, viernes 4 PM, según el horario uno')."}
+{"i":62,"ids0":125,"cls":"PARCIAL","note":"Maternidad, paternidad, luto y embarazo. Omite lactancia, licencias parentales, citas médicas, acompañamiento escolar y citaciones judiciales (art.47 num.4, 8-10)."}
+{"i":63,"ids0":127,"cls":"CORRECTA","note":"Art.47 num.5: 2 semanas, ampliables a 5 según el desempleo."}
+{"i":64,"ids0":128,"cls":"NO RESPONDE CORRECTAMENTE","note":"'Gran Servicios' no aparece en los docs."}
+{"i":65,"ids0":129,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.71 lit. n) (funciones del cargo y las conexas o complementarias) existe pero no llegó al contexto. Mejor que la cita inventada del art.123 de la base."}
+{"i":66,"ids0":130,"cls":"CORRECTA","note":"Art.40 literal: época fijada por la empresa, concesión oficiosa o a petición, aviso con 15 días de anticipación. Mejora frente a la base."}
+{"i":67,"ids0":131,"cls":"CORRECTA","note":"Art.8 (máx. 2 meses) y art.9 (si continúa tras expirar, el contrato rige desde el inicio). Redacción algo confusa ('la no renovación')."}
+{"i":68,"ids0":132,"cls":"NO RESPONDE CORRECTAMENTE","note":"No hay procedimiento de día no remunerado en los docs (el conducto regular del art.101 B-V no llegó al contexto). Abstención aceptable."}
+{"i":69,"ids0":133,"cls":"CORRECTA","note":"Art.58: 30-abr, 30-ago, 30-dic, hasta 2 SMMLV."}
+{"i":70,"ids0":134,"cls":"PARCIAL","note":"80% desde el 1-jul-2025 y 90% desde el 1-jul-2026: correcto, pero omite el 100% desde el 1-jul-2027 (la lista queda corta)."}
+{"i":71,"ids0":135,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no regulan a los externos. Corrige la cita inventada del art.1 de la base."}
+{"i":72,"ids0":136,"cls":"CORRECTA","note":"2 semanas y Registro Civil ante la EPS en 30 días (art.47 num.5). No menciona la ampliación hasta 5 semanas (no se preguntaba)."}
+{"i":73,"ids0":137,"cls":"CORRECTA","note":"Art.77 num.18 y Ley 2191 de 2022, con el alcance de la obligación."}
+{"i":74,"ids0":138,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El preaviso de 30 días del art.4 no llegó al contexto (retrieval). Mejor que la malinterpretación de la base."}
+{"i":75,"ids0":139,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no tienen un trámite específico para la incapacidad de un hijo. El contexto traía el art.46 (calamidad doméstica), pero no el art.49. Abstención aceptable, mejor que el art.61 distorsionado de la base."}
+{"i":76,"ids0":141,"cls":"PARCIAL","note":"Define bien el acoso (art.126) y remite al art.128, pero no usa el art.129 (no es acoso ejercer la potestad disciplinaria), que resolvía el caso. Corrige el rechazo indebido por premisa de la base."}
+{"i":77,"ids0":142,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no regulan la venta 'fuera'; las rifas y colectas (art.81 num.7) no llegaron al contexto. Corrige la cita inventada del art.81 de la base."}
+{"i":78,"ids0":143,"cls":"NO RESPONDE PERO DEBERÍA","note":"Pregunta compuesta. El área receptora no está en el .md (hueco de contenido), pero la 2.ª parte sí estaba en el contexto (§15: falta grave → medida disciplinaria o terminación con justa causa). Debió responderla. Al menos ya no inventa el área."}
+{"i":79,"ids0":144,"cls":"NO RESPONDE PERO DEBERÍA","note":"Respuesta VACÍA: 'ha implementado los siguientes sistemas:' y luego nada. SAGRILAFT y OEA estaban en el contexto (conf 1.0). Truncamiento en el post-procesado. EMPEORA frente a la base (CORRECTA)."}
+{"i":80,"ids0":145,"cls":"PARCIAL","note":"El contenido es correcto (arts. 90/92 del RIT: definición; comunicarlo por escrito a la Gerencia o RRHH), pero lo atribuye falsamente al 'Código de Ética', que no lo define. Omite las tipologías del Código."}
+{"i":81,"ids0":147,"cls":"PARCIAL","note":"Confidencialidad durante y después de la relación (Código §12 y RIT art.84): correcto y detallado. Omite la propiedad intelectual (Código §13), que también se preguntaba."}
+{"i":82,"ids0":150,"cls":"PARCIAL","note":"Respuesta TRUNCADA: da las tres categorías y los ejemplos de áreas negras, pero se corta en 'Ejemplos de áreas grises:'. Faltan grises y blancas."}
+{"i":83,"ids0":151,"cls":"CORRECTA","note":"Reglas del I-RH-003 completas."}
+{"i":84,"ids0":152,"cls":"PARCIAL","note":"Joyas, maquillaje y celular: correcto. Pero afirma FALSAMENTE que 'no se mencionan restricciones sobre alimentos, bebidas u otras sustancias' (el BPM prohíbe fumar, beber, alimentos, bebidas, medicamentos, alcohol/SPA)."}
+{"i":85,"ids0":153,"cls":"CORRECTA","note":"Misión y visión del I-RH-001."}
+{"i":86,"ids0":154,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no regulan la devolución de la dotación. Corrige la alucinación de la base sobre el art.58."}
+{"i":87,"ids0":155,"cls":"CORRECTA","note":"ISO 9001/2004/BVQI e ISO 13485/2018/ICONTEC (omite que la 9001 se mantuvo hasta 2018)."}
+{"i":88,"ids0":156,"cls":"PARCIAL","note":"Gerente y Director Técnico correctos. La Directora de RRHH queda TRUNCADA en 'Aura Ma.' (es Aura Ma. Niño Mejía): corte en el punto de la abreviatura. Mejora frente a la base (falso negativo)."}
+{"i":89,"ids0":157,"cls":"CORRECTA","note":"Las cuatro áreas de proceso y las operaciones de Producción Farmacéutica (I-RH-001)."}
+{"i":90,"ids0":158,"cls":"CORRECTA","note":"Cinco beneficios del I-RH-001 (la lista se corta tras el 5.º con '…', pero cumple lo pedido)."}
+{"i":91,"ids0":159,"cls":"CORRECTA","note":"7:30-5:00 L-J y 7:30-4:30 el viernes (art.23 §22.1 vigente). Corrige el error del viernes de la base."}
+{"i":92,"ids0":161,"cls":"CORRECTA","note":"Pasos 1-5 del I-RH-011 en orden."}
+{"i":93,"ids0":162,"cls":"CORRECTA","note":"Locker asignado, zapatos en bolsa plástica (I-RH-009/011)."}
+{"i":94,"ids0":163,"cls":"PARCIAL","note":"Orden cofia/auditiva → uniforme → polainas → guantes correcto, pero omite la blusa blanca, numera mal los pasos (uniforme es el 6, polainas el 7, guantes el 10) y dice 'la escafandra al salir'."}
+{"i":95,"ids0":164,"cls":"CORRECTA","note":"Sin maquillaje, sin accesorios (joyas, relojes, celular), sin ropa distinta a la dotación (BPM, I-RH-009/011)."}
+{"i":96,"ids0":165,"cls":"PARCIAL","note":"Escafandra y guantes (12) → polainas (13) correcto, y la cofia se conserva. Omite el paso 14 (cruzar la banca y retirar el uniforme)."}
+{"i":97,"ids0":166,"cls":"CORRECTA","note":"Descanso de 20 min del personal operativo (art.23)."}
+{"i":98,"ids0":167,"cls":"PARCIAL","note":"El almuerzo de 1-2 PM sale de los horarios derogados; el horario vigente no fija la franja (igual que la base)."}
+{"i":99,"ids0":168,"cls":"NO RESPONDE CORRECTAMENTE","note":"La duración de la inducción no está en los docs."}
+{"i":100,"ids0":169,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.71 lit. n) (funciones conexas o complementarias) no llegó al contexto (retrieval)."}
+{"i":101,"ids0":170,"cls":"INCORRECTA/ALUCINACIÓN","note":"Solo 3 'pasos' y mal ordenados ('3. desinfección de guantes'). Omite ropa/joyas al locker, blusa blanca, lavado de manos y uniforme del I-RH-009."}
+{"i":102,"ids0":171,"cls":"CORRECTA","note":"Locker asignado, zapatos en bolsa plástica (I-RH-009). Sin la degeneración de la base."}
+{"i":103,"ids0":172,"cls":"CORRECTA","note":"Cofia, protección auditiva, blusa blanca, uniforme, guantes, en el orden del I-RH-009."}
+{"i":104,"ids0":173,"cls":"PARCIAL","note":"Maquillaje correcto. En ropa solo dice que se quita la de calle; no da la regla 'ninguna ropa diferente a la dotación'."}
+{"i":105,"ids0":174,"cls":"CORRECTA","note":"Guantes → uniforme, sin retirar la cofia (I-RH-009)."}
+{"i":106,"ids0":175,"cls":"CORRECTA","note":"Los 4 pasos del I-RH-010."}
+{"i":107,"ids0":176,"cls":"CORRECTA","note":"Locker asignado (I-RH-010), sin coletillas."}
+{"i":108,"ids0":177,"cls":"CORRECTA","note":"Overol y EPP entregados, sin elementos diferentes a la dotación (I-RH-010). Omite la blusa blanca. Corrige la confusión con el área blanca de la base."}
+{"i":109,"ids0":178,"cls":"CORRECTA","note":"Sin ropa distinta a la dotación y cumplir BPM (I-RH-010)."}
+{"i":110,"ids0":179,"cls":"CORRECTA","note":"Los 14 pasos del I-RH-006."}
+{"i":111,"ids0":180,"cls":"CORRECTA","note":"Zapatos antes de la línea amarilla, prendas al locker, y la excepción de la nota general."}
+{"i":112,"ids0":181,"cls":"PARCIAL","note":"Orden de colocación correcto (cofia/auditiva → uniforme → polainas → guantes), pero atribuye uniforme y polainas al 'procedimiento de áreas grises' (que no lleva polainas) e incluye la escafandra 'al salir' como elemento a colocar. Mejor que la base."}
+{"i":113,"ids0":182,"cls":"PARCIAL","note":"Maquillaje y accesorios correctos. Afirma que 'no se mencionan restricciones sobre equipos', pero el I-RH-006 dice 'No tocar ningún equipo sin previa autorización'. Omite seguir al guía."}
+{"i":114,"ids0":183,"cls":"PARCIAL","note":"Uniforme a la caneca y cofia hasta salir del vestier: correcto. Lo llama 'área gris' y omite escafandra y polainas en el orden de retiro (I-RH-006 pasos 11-14)."}
+{"i":115,"ids0":184,"cls":"CORRECTA","note":"Todo el personal que labore e ingrese al área de fabricación, cumpliendo las BPM (I-RH-012). Mejora frente a la base."}
+{"i":116,"ids0":185,"cls":"CORRECTA","note":"Pasos 1-3 del I-RH-012."}
+{"i":117,"ids0":186,"cls":"INCORRECTA/ALUCINACIÓN","note":"Responde los pasos 4-6 del I-RH-009 (lavado, uniforme, cinta) en vez del I-RH-012 (dorso con dedos entrelazados, palmas, dedos y uñas), aunque estos estaban en el contexto. Empeora frente a la base."}
+{"i":118,"ids0":187,"cls":"CORRECTA","note":"30 s, pasos 3-6."}
+{"i":119,"ids0":189,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el contexto traía los arts. 124 y 103 (reclamo ante el jefe/director de área o RRHH, por escrito). Empeora frente a la base (CORRECTA)."}
+{"i":120,"ids0":190,"cls":"CORRECTA","note":"Tecnología de Información (I-RH-001), sin la mezcla con Mantenimiento de la base."}
+{"i":121,"ids0":191,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no regulan a los temporales. Corrige el '36 h' inventado de la base."}
+{"i":122,"ids0":192,"cls":"PARCIAL","note":"Igual que la base: define el contrato indefinido para una pregunta personal. Al menos aclara que no se especifica su caso. No resume los tipos (arts. 3-5)."}
+{"i":123,"ids0":193,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.71 lit. n) no llegó al contexto (retrieval). Mejor que la inversión del art.81 de la base."}
+{"i":124,"ids0":194,"cls":"NO RESPONDE CORRECTAMENTE","note":"No hay procedimiento por pérdida de escafandra en los docs."}
+{"i":125,"ids0":195,"cls":"PARCIAL","note":"Dos prohibiciones reales y bien citadas (art.102 num.36 y 37: alterar dispositivos de seguridad; incumplir procedimientos de seguridad). Faltan muchas más (alcohol/SPA, máquinas no asignadas, actos inseguros)."}
+{"i":126,"ids0":196,"cls":"CORRECTA","note":"Responsabilidades del trabajador en SST tal como las lista el I-RH-004 (capacitación, cumplir normas del SG-SST, uso y cuidado de EPP). Lista parcial pero fiel."}
+{"i":127,"ids0":197,"cls":"PARCIAL","note":"Horario administrativo vigente, pero dice 'lunes a viernes 7:30-5:00' (el viernes es hasta 4:30). Aclara bien que no hay horarios operativos. Empeora frente a la base (CORRECTA)."}
+{"i":128,"ids0":198,"cls":"PARCIAL","note":"Dice bien que no hay fecha de diciembre, pero generaliza el pago proporcional del art.45 par. (que solo aplica a contratos fijos <1 año) a todos los trabajadores."}
+{"i":129,"ids0":199,"cls":"CORRECTA","note":"Resume el Código de Ética (libre de acoso, SST, diversidad) y aclara que no hay info sobre el clima laboral."}
+{"i":130,"ids0":200,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs."}
+{"i":131,"ids0":201,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no regulan vacaciones colectivas. Corrige la alucinación de la base sobre el art.40."}
+{"i":132,"ids0":202,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el art.44 (las vacaciones se pagan con el salario ordinario) estaba en el contexto."}
+{"i":133,"ids0":203,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el art.44 estaba en el contexto. Empeora frente a la base (CORRECTA)."}
+{"i":134,"ids0":204,"cls":"CORRECTA","note":"Art.40 (aviso con 15 días de anticipación) y aclara que no hay un día fijo."}
+{"i":135,"ids0":205,"cls":"INCORRECTA/ALUCINACIÓN","note":"Afirma que 'según el art.23 el trabajo después de las 6:00 p.m. genera recargo nocturno': FALSO, es desde las 7:00 p.m. (arts. 23 par.5 y 29). Tampoco da los porcentajes del art.33. Empeora frente a la base."}
+{"i":136,"ids0":206,"cls":"CORRECTA","note":"7:00 p.m., con las Leyes 1846/2017 y 2466/2025 que cita el art.29 (cita correcta)."}
+{"i":137,"ids0":209,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs. Corrige la invención de la base."}
+{"i":138,"ids0":213,"cls":"NO RESPONDE CORRECTAMENTE","note":"El cumpleaños no está en los docs."}
+{"i":139,"ids0":214,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el contexto traía el art.35 (festivos de descanso obligatorio remunerado) y el recargo del 90%."}
+{"i":140,"ids0":215,"cls":"INCORRECTA/ALUCINACIÓN","note":"Transcribe los HORARIOS UNO/DOS derogados como 'horarios de diurna', citando 'artículos 23 y 22'."}
+{"i":141,"ids0":216,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el contexto traía 'ISO 9001 (BVQI)' e 'ISO 13485 (ICONTEC)'."}
+{"i":142,"ids0":218,"cls":"NO RESPONDE CORRECTAMENTE","note":"No hay número de emergencias en los docs."}
+{"i":143,"ids0":219,"cls":"NO RESPONDE CORRECTAMENTE","note":"Pregunta ambigua sin dato en los docs. Corrige la plantilla de 42 h de la base."}
+{"i":144,"ids0":222,"cls":"RECHAZO INDEBIDO","note":"Igual que la base: el salario mínimo legal es público, no confidencial (regla de privacidad antes del LLM)."}
+{"i":145,"ids0":225,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los horarios de diciembre no están en los docs. Corrige el horario inventado de la base."}
+{"i":146,"ids0":226,"cls":"NO RESPONDE PERO DEBERÍA","note":"El 25 de diciembre es festivo de descanso remunerado (art.35), pero no llegó al contexto (retrieval)."}
+{"i":147,"ids0":227,"cls":"NO RESPONDE PERO DEBERÍA","note":"El art.21 par.1 (vacaciones de los aprendices en fase práctica/dual) no llegó al contexto (retrieval)."}
+{"i":148,"ids0":228,"cls":"CORRECTA","note":"Art.39 (15 días hábiles) bien citado. Aclara que no hay mes fijo y explica los días hábiles administrativo/operativo."}
+{"i":149,"ids0":231,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs. Corrige la cita inventada del art.128 de la base."}

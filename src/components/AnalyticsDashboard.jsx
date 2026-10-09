@@ -8,8 +8,11 @@ const AnalyticsDashboard = ({ onClose }) => {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, remote: 0, local: 0, savedTime: 0 });
     const [systemErrors, setSystemErrors] = useState([]);
-    const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'system' | 'errors'
+    const [suggestions, setSuggestions] = useState([]);
+    const [ratingStats, setRatingStats] = useState({ totals: [], recent: [] });
+    const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'system' | 'errors' | 'feedback'
     const [errorFilter, setErrorFilter] = useState('all'); // 'all' | 'Mic'
+    const [suggestionTypeFilter, setSuggestionTypeFilter] = useState('all');
 
     const fetchAnalytics = async () => {
         setLoading(true);
@@ -33,6 +36,26 @@ const AnalyticsDashboard = ({ onClose }) => {
             if (data.errors) setSystemErrors(data.errors);
         } catch (err) {
             console.error('Error fetching system errors:', err);
+        }
+    };
+
+    const fetchSuggestions = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/suggestions?limit=200`);
+            const data = await res.json();
+            if (data.suggestions) setSuggestions(data.suggestions);
+        } catch (err) {
+            console.error('Error fetching suggestions:', err);
+        }
+    };
+
+    const fetchRatingStats = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/rate-answer/stats?limit=200`);
+            const data = await res.json();
+            if (data.totals) setRatingStats(data);
+        } catch (err) {
+            console.error('Error fetching rating stats:', err);
         }
     };
 
@@ -78,9 +101,13 @@ const AnalyticsDashboard = ({ onClose }) => {
     useEffect(() => {
         fetchAnalytics();
         fetchSystemErrors();
+        fetchSuggestions();
+        fetchRatingStats();
         const interval = setInterval(() => {
             fetchAnalytics();
             fetchSystemErrors();
+            fetchSuggestions();
+            fetchRatingStats();
         }, 10000); // Auto-refresh cada 10s
         return () => clearInterval(interval);
     }, []);
@@ -101,6 +128,16 @@ const AnalyticsDashboard = ({ onClose }) => {
         if (ua.includes('Macintosh')) return '💻 Mac';
         return '🖥️ Desktop/Other';
     };
+
+    const SUGGESTION_TYPE_LABELS = {
+        sugerencia: { label: '💡 Sugerencia', cls: 'bg-cat-amber-fill text-cat-amber border-cat-amber/30' },
+        respuesta_incorrecta: { label: '⚠️ Resp. Incorrecta', cls: 'bg-cat-coral-fill text-cat-coral border-cat-coral/30' },
+        falta_info: { label: '📄 Falta Info', cls: 'bg-cat-purple-fill text-cat-purple border-cat-purple/30' },
+        felicitacion: { label: '😊 Felicitación', cls: 'bg-cat-green-fill text-cat-green border-cat-green/30' },
+        otro: { label: '💬 Otro', cls: 'bg-surface text-muted border-line' },
+    };
+    const RATING_LABELS = { good: '😊 Buena', neutral: '😐 Más o menos', bad: '😞 No sirvió' };
+    const ratingCount = (r) => ratingStats.totals.find(t => t.rating === r)?.count || 0;
 
     const getBrowserInfo = (ua) => {
         if (!ua) return '---';
@@ -158,12 +195,131 @@ const AnalyticsDashboard = ({ onClose }) => {
                         </span>
                     )}
                 </button>
+                <button
+                    onClick={() => setActiveTab('feedback')}
+                    className={`px-6 py-3 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'feedback' ? 'bg-cat-purple text-white shadow-[0_2px_12px_rgba(83,74,183,0.25)]' : 'bg-bg-panel border border-line text-muted hover:bg-surface'}`}
+                >
+                    💬 Buzón y Calificaciones
+                    {suggestions.filter(s => s.status === 'nuevo').length > 0 && (
+                        <span className="bg-cat-purple text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">
+                            {suggestions.filter(s => s.status === 'nuevo').length}
+                        </span>
+                    )}
+                </button>
             </div>
 
             {/* Content Area */}
             <div className="flex-grow overflow-hidden flex flex-col">
                 {activeTab === 'system' ? (
                     <SystemStatus />
+                ) : activeTab === 'feedback' ? (
+                    <div className="flex-grow overflow-auto custom-scrollbar space-y-8 pb-4">
+                        {/* KPI de calificaciones */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-cat-green-fill border border-cat-green/20 p-4 rounded-xl">
+                                <div className="text-cat-green text-xs uppercase mb-1">😊 Me sirvió</div>
+                                <div className="text-3xl font-medium text-cat-green">{ratingCount('good')}</div>
+                            </div>
+                            <div className="bg-cat-amber-fill border border-cat-amber/20 p-4 rounded-xl">
+                                <div className="text-cat-amber text-xs uppercase mb-1">😐 Más o menos</div>
+                                <div className="text-3xl font-medium text-cat-amber">{ratingCount('neutral')}</div>
+                            </div>
+                            <div className="bg-cat-coral-fill border border-cat-coral/20 p-4 rounded-xl">
+                                <div className="text-cat-coral text-xs uppercase mb-1">😞 No sirvió</div>
+                                <div className="text-3xl font-medium text-cat-coral">{ratingCount('bad')}</div>
+                            </div>
+                        </div>
+
+                        {/* Buzón de sugerencias */}
+                        <div className="bg-bg-panel rounded-xl border border-line overflow-hidden flex flex-col">
+                            <div className="px-6 py-4 border-b border-line bg-surface flex flex-wrap justify-between items-center gap-2">
+                                <h3 className="text-sm font-medium text-ink">Buzón de Sugerencias ({suggestions.length})</h3>
+                                <div className="flex gap-2 flex-wrap">
+                                    <button
+                                        onClick={() => setSuggestionTypeFilter('all')}
+                                        className={`px-3 py-1 rounded text-[10px] border transition-all ${suggestionTypeFilter === 'all' ? 'bg-surface border-line text-ink' : 'border-transparent text-muted'}`}
+                                    >
+                                        Todos
+                                    </button>
+                                    {Object.entries(SUGGESTION_TYPE_LABELS).map(([key, v]) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => setSuggestionTypeFilter(key)}
+                                            className={`px-3 py-1 rounded text-[10px] border transition-all ${suggestionTypeFilter === key ? v.cls : 'border-transparent text-muted'}`}
+                                        >
+                                            {v.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="overflow-auto p-4 space-y-3 custom-scrollbar max-h-[420px]">
+                                {suggestions.length === 0 ? (
+                                    <div className="text-center py-10 text-muted italic">Aún no hay mensajes en el buzón.</div>
+                                ) : (
+                                    suggestions
+                                        .filter(s => suggestionTypeFilter === 'all' || s.type === suggestionTypeFilter)
+                                        .map((s) => {
+                                            const typeInfo = SUGGESTION_TYPE_LABELS[s.type] || SUGGESTION_TYPE_LABELS.otro;
+                                            return (
+                                                <motion.div
+                                                    key={s.id}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="p-4 rounded-xl border border-line bg-bg-page flex flex-col gap-2"
+                                                >
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${typeInfo.cls}`}>{typeInfo.label}</span>
+                                                        <span className="text-[10px] text-muted tabular-nums">{new Date(s.created_at).toLocaleString()}</span>
+                                                    </div>
+                                                    <p className="text-sm text-ink">{s.message}</p>
+                                                    {(s.name || s.area) && (
+                                                        <div className="flex gap-2 text-[10px] text-muted">
+                                                            {s.name && <span>👤 {s.name}</span>}
+                                                            {s.area && <span>🏭 {s.area}</span>}
+                                                        </div>
+                                                    )}
+                                                </motion.div>
+                                            );
+                                        })
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Respuestas calificadas recientemente */}
+                        <div className="bg-bg-panel rounded-xl border border-line overflow-hidden flex flex-col">
+                            <div className="px-6 py-4 border-b border-line bg-surface">
+                                <h3 className="text-sm font-medium text-ink">Respuestas Calificadas Recientemente</h3>
+                            </div>
+                            <div className="overflow-auto p-4 space-y-3 custom-scrollbar max-h-[420px]">
+                                {ratingStats.recent.length === 0 ? (
+                                    <div className="text-center py-10 text-muted italic">Aún no hay respuestas calificadas.</div>
+                                ) : (
+                                    ratingStats.recent.map((r) => (
+                                        <motion.div
+                                            key={r.id}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className={`p-4 rounded-xl border flex flex-col gap-2 ${
+                                                r.rating === 'bad' ? 'bg-cat-coral-fill border-cat-coral/20'
+                                                : r.rating === 'neutral' ? 'bg-cat-amber-fill border-cat-amber/20'
+                                                : 'bg-cat-green-fill border-cat-green/20'
+                                            }`}
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <span className="text-xs font-medium text-ink">{RATING_LABELS[r.rating] || r.rating}</span>
+                                                <span className="text-[10px] text-muted tabular-nums">{new Date(r.created_at).toLocaleString()}</span>
+                                            </div>
+                                            <p className="text-sm text-ink font-medium">"{r.question}"</p>
+                                            {r.answer && <p className="text-xs text-muted line-clamp-3">{r.answer}</p>}
+                                            {r.sources?.length > 0 && (
+                                                <p className="text-[10px] text-muted">📎 {r.sources.join(' · ')}</p>
+                                            )}
+                                        </motion.div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 ) : activeTab === 'errors' ? (
                     <div className="flex-grow flex flex-col overflow-hidden">
                         <div className="bg-bg-panel rounded-xl border border-line overflow-hidden flex flex-col flex-grow">

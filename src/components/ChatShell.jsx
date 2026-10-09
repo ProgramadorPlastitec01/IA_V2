@@ -4,19 +4,20 @@ import aiClient from '../utils/aiClient';
 import { API_BASE_URL } from '../utils/apiConfig';
 import NexusCore from './NexusCore';
 import CompanyLogo from './CompanyLogo';
-import TypewriterText from './TypewriterText';
 import HelpGuide from './HelpGuide';
 import DocumentsGuide from './DocumentsGuide';
 
-// 5 minutos sin interacción → reinicio de conversación (kiosko compartido).
+// 5 minutos sin interacción → se limpia la pregunta/respuesta (kiosko compartido).
 const INACTIVITY_RESET_MS = 5 * 60 * 1000;
 
 /**
- * ChatShell — Fase 3 del rediseño.
- * Chat de 2 paneles con el MOTOR REAL del kiosco portado desde VoiceChat.jsx:
- * aiClient.query (texto+voz), conversationId, QuickCache, IntentEngine, mutex,
- * timeouts adaptativos, errores diferenciados, TTS, sub-estados, NexusCore.
- * VoiceChat.jsx permanece intacto como rollback.
+ * ChatShell — Rediseño 2026-10-09: modo PREGUNTA → RESPUESTA (no conversación).
+ * En las pruebas de TI los usuarios asumieron que era un chat con memoria y
+ * hacían repreguntas ("¿y si es mi hijo?"). El backend responde cada pregunta
+ * de forma independiente, así que la UI ahora muestra UNA pregunta y UNA
+ * respuesta con sus fuentes, feedback y copiar. Cada consulta reemplaza la anterior.
+ * El motor (aiClient, voz, TTS, mutex, timeouts, PIN admin) es el mismo de antes.
+ * Respaldo de la versión chat: backups/ui_2026-10-09/ChatShell.jsx
  */
 
 // ── Categorías FAQ → color del diseño (vía CSS vars de @theme) ──────────────
@@ -33,73 +34,231 @@ const ICONS = {
     alert: <><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></>,
     clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
     phone: <><rect x="5" y="2" width="14" height="20" rx="2" /><line x1="12" y1="18" x2="12.01" y2="18" /></>,
+    drop: <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />,
 };
 
-// ── FAQ (contenido DEFINITIVO; al tocar dispara handleQuery real) ───────────
+// ── FAQ (al hacer clic se usa como pregunta y se consulta) ──────────────────
 const FAQS = [
     { theme: 'teal', icon: 'calendar', cat: 'Vacaciones y licencias', q: '¿Cuántos días de permiso por luto tengo?', freq: 8 },
     { theme: 'coral', icon: 'alert', cat: 'Accidentes', q: '¿Cómo reporto un accidente laboral?', freq: 6 },
     { theme: 'amber', icon: 'clock', cat: 'Horarios', q: '¿Cuál es el horario de trabajo?', freq: 4 },
     { theme: 'purple', icon: 'phone', cat: 'Normas internas', q: '¿Puedo usar mi celular en la planta?', freq: 4 },
     { theme: 'teal', icon: 'calendar', cat: 'Vacaciones y licencias', q: '¿Cómo solicito vacaciones?', freq: 2 },
+    // Solo en "Ver todas" (validadas contra el backend el 2026-10-09; sin contador de uso real).
+    { theme: 'teal', icon: 'calendar', cat: 'Vacaciones y licencias', q: '¿Cuántos días de vacaciones tengo al año?' },
+    { theme: 'amber', icon: 'clock', cat: 'Horarios', q: '¿Cuántas horas tiene la jornada laboral semanal?' },
+    { theme: 'green', icon: 'drop', cat: 'Higiene y BPM', q: '¿Cuál es el procedimiento de lavado de manos?' },
+    { theme: 'purple', icon: 'phone', cat: 'Normas internas', q: '¿Puedo ingresar alimentos a la planta?' },
 ];
-
-// Mensaje de bienvenida (no hay store de config en el frontend; constante).
-const WELCOME = '¡Hola! 👋 Soy tu asistente de RRHH. Pregúntame sobre el Reglamento Interno, BPM, vacaciones, permisos, horarios y más.';
-
-// Auto-cierre 25s: DESACTIVADO en modo chat (los mensajes persisten en el hilo).
-// Código conservado abajo (ver useEffect guardado) — no se borra.
-const CHAT_AUTOCLOSE_ENABLED = false;
+// Cuántas tarjetas se muestran antes de "Ver todas".
+const FAQ_VISIBLE = 5;
 
 // Límite de longitud de consulta (espejo del MAX_QUERY_LENGTH del backend).
 // El contador discreto aparece a partir de COUNTER_THRESHOLD.
 const MAX_QUERY_LENGTH = 200;
 const COUNTER_THRESHOLD = 160;
 
+// Separador que el backend pone antes del bloque de fuentes:
+// "...respuesta\n\n---\n📎 *Información extraída de:*\n- Doc A\n- Doc B"
+const SOURCES_SPLIT_RE = /\n\s*-{3,}\s*\n/;
+
+/** Separa el cuerpo de la respuesta y la lista de fuentes que agrega el backend. */
+const splitAnswer = (raw) => {
+    const text = (raw || '').trim();
+    const parts = text.split(SOURCES_SPLIT_RE);
+    if (parts.length < 2) return { body: text, sources: [] };
+    const tail = parts.pop();
+    if (!/informaci[oó]n extra[ií]da de/i.test(tail)) return { body: text, sources: [] };
+    const sources = tail.split('\n')
+        .map(l => l.trim())
+        .filter(l => /^[-•*]\s+/.test(l))
+        .map(l => l.replace(/^[-•*]\s+/, '').replace(/\*/g, '').trim())
+        .filter(Boolean);
+    return { body: parts.join('\n\n---\n').trim(), sources };
+};
+
+/** Negritas/cursivas inline (**x**, *x*) → elementos React, sin innerHTML. */
+const renderInline = (line, keyPrefix) => {
+    const out = [];
+    const re = /(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g;
+    let last = 0, m, i = 0;
+    while ((m = re.exec(line)) !== null) {
+        if (m.index > last) out.push(line.slice(last, m.index));
+        const tok = m[0];
+        if (tok.startsWith('**')) out.push(<strong key={`${keyPrefix}-${i++}`} className="font-semibold">{tok.slice(2, -2)}</strong>);
+        else out.push(<em key={`${keyPrefix}-${i++}`}>{tok.slice(1, -1)}</em>);
+        last = m.index + tok.length;
+    }
+    if (last < line.length) out.push(line.slice(last));
+    return out;
+};
+
+/** Markdown mínimo de las respuestas: párrafos, viñetas y listas numeradas. */
+const AnswerBody = ({ text }) => {
+    const blocks = [];
+    let list = null;
+    // "...es el siguiente: 1. Paso uno\n2. Paso dos" → el paso 1 pasa a su propia línea.
+    const normalized = /\n\s*2[.)]\s/.test(text) ? text.replace(/:\s+1([.)])\s+/, ':\n1$1 ') : text;
+    normalized.split('\n').forEach((raw) => {
+        const line = raw.trim();
+        const bullet = line.match(/^(?:[-•*]|\d+[.)])\s+(.*)$/);
+        if (bullet) {
+            const ordered = /^\d/.test(line);
+            if (!list || list.ordered !== ordered) { list = { type: 'list', ordered, items: [] }; blocks.push(list); }
+            list.items.push(bullet[1]);
+            return;
+        }
+        list = null;
+        if (!line || /^-{3,}$/.test(line)) return;
+        blocks.push({ type: 'p', text: line.replace(/^#+\s*/, '') });
+    });
+
+    return (
+        <div className="flex flex-col gap-3 text-[15px] leading-relaxed text-ink">
+            {blocks.map((b, i) => {
+                if (b.type === 'p') return <p key={i}>{renderInline(b.text, `p${i}`)}</p>;
+                const Tag = b.ordered ? 'ol' : 'ul';
+                return (
+                    <Tag key={i} className={`${b.ordered ? 'list-decimal' : 'list-disc'} pl-5 flex flex-col gap-1`}>
+                        {b.items.map((it, j) => <li key={j}>{renderInline(it, `l${i}-${j}`)}</li>)}
+                    </Tag>
+                );
+            })}
+        </div>
+    );
+};
+
 const MicIcon = () => (
-    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24">
+    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24">
         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" />
         <line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
     </svg>
 );
 const StopIcon = () => (<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>);
 const SendIcon = () => (
-    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
         <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
     </svg>
 );
 const SpeakerIcon = () => (
-    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
     </svg>
 );
+const ChatBubbleIcon = () => (
+    <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+        <line x1="8" y1="10" x2="16" y2="10" /><line x1="8" y1="14" x2="13" y2="14" />
+    </svg>
+);
+const DocIcon = () => (
+    <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+        <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="14" y2="17" />
+    </svg>
+);
+const InfoIcon = () => (
+    <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+    </svg>
+);
+const ClipIcon = () => (
+    <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+);
+const ThumbUpIcon = () => (
+    <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    </svg>
+);
+const ThumbDownIcon = () => (
+    <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+    </svg>
+);
+const CopyIcon = () => (
+    <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+);
 
-let msgSeq = 0;
-const newId = () => `m${++msgSeq}`;
+/** Tarjeta de pregunta frecuente (panel derecho y modal "Ver todas"). */
+const FaqCard = ({ faq, featured, onPick, disabled }) => {
+    const c = CAT[faq.theme];
+    return (
+        <button
+            onClick={() => onPick(faq.q)}
+            disabled={disabled}
+            className="group relative bg-bg-panel border border-line rounded-2xl p-4 flex items-start gap-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] disabled:opacity-60 disabled:pointer-events-none"
+        >
+            <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:rotate-6 group-hover:scale-105" style={{ background: c.fill, color: c.color }}>
+                <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">{ICONS[faq.icon]}</svg>
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium uppercase tracking-wider mb-1 pr-16" style={{ color: c.color }}>{faq.cat}</div>
+                <div className="text-[14px] text-ink leading-snug mb-2.5">{faq.q}</div>
+                {faq.freq > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface text-muted">
+                        <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                        {faq.freq} consultas
+                    </span>
+                )}
+            </div>
+            {featured && <span className="absolute top-3 right-3 bg-brand text-white text-[10px] font-medium px-2 py-0.5 rounded-full tracking-wide">⭐ Popular</span>}
+        </button>
+    );
+};
+
+/** Copia al portapapeles; en kiosco por HTTP (sin clipboard API) usa execCommand. */
+const copyToClipboard = async (text) => {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch { /* fallback abajo */ }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch { return false; }
+};
 
 const ChatShell = () => {
-    // ── Estado de chat con historial ──────────────────────────────────────
-    const [messages, setMessages] = useState([{ id: newId(), role: 'bot', text: WELCOME }]);
+    // ── Estado: UNA pregunta y UNA respuesta ──────────────────────────────
+    // answer = { question, body, sources, raw } | null
+    const [answer, setAnswer] = useState(null);
+    const [pendingQuestion, setPendingQuestion] = useState('');
+    const [feedback, setFeedback] = useState(null); // null | 'up' | 'down'
+    const [copied, setCopied] = useState(false);
     const [appState, setAppState] = useState('IDLE'); // IDLE, LISTENING, PROCESSING, RESPONDING, ERROR
     const [processingStep, setProcessingStep] = useState(0); // 1 Recibiendo, 2 Analizando, 3 Generando
     const [inputValue, setInputValue] = useState('');
     const [error, setError] = useState(null);
     const [isGuideOpen, setIsGuideOpen] = useState(false);
     const [isDocsOpen, setIsDocsOpen] = useState(false);
+    const [isFaqOpen, setIsFaqOpen] = useState(false);
     const [showPinModal, setShowPinModal] = useState(false);
     const [isSupported, setIsSupported] = useState(true);
 
-    // Reinicio de conversación (manual con confirmación + auto por inactividad)
+    // Reinicio (manual con confirmación + auto por inactividad)
     const [confirmingReset, setConfirmingReset] = useState(false);
     const confirmResetTimerRef = useRef(null);
     const lastInteractionRef = useRef(Date.now());
+    const copiedTimerRef = useRef(null);
 
     // Métricas en cliente (NO tocan aiClient) — arrancan en 0
     const [metrics, setMetrics] = useState({ consultas: 0, resueltas: 0 });
 
     const volume = useMotionValue(0);
 
-    // ── Refs del motor (portados de VoiceChat) ────────────────────────────
+    // ── Refs del motor ────────────────────────────────────────────────────
     const recognitionRef = useRef(null);
     const synthRef = useRef(typeof window !== 'undefined' ? window.speechSynthesis : null);
     const streamRef = useRef(null);
@@ -116,7 +275,8 @@ const ChatShell = () => {
     useEffect(() => { stateRef.current = appState; }, [appState]);
     const mountedRef = useRef(true);
     const isLocked = useRef(false);
-    const messagesEndRef = useRef(null);
+    const inputRef = useRef(null);
+    const answerRef = useRef(null);
 
     const isMobileDevice = useRef((() => {
         const ua = navigator.userAgent;
@@ -142,19 +302,12 @@ const ChatShell = () => {
         };
     }, []);
 
-    // Auto-scroll al último mensaje
+    // En pantallas angostas la respuesta queda debajo: llevarla a la vista.
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, processingStep, appState]);
-
-    // ── Auto-cierre 25s — CONSERVADO pero DESACTIVADO en chat ─────────────
-    // En un chat con historial, borrar mensajes contradice el paradigma.
-    // El flag CHAT_AUTOCLOSE_ENABLED=false mantiene el efecto inerte.
-    useEffect(() => {
-        if (!CHAT_AUTOCLOSE_ENABLED) return; // ← desactivado por decisión de producto
-        // (Código original de auto-cierre conservado intencionalmente; si se
-        //  reactivara, aquí iría el setInterval que limpiaba la respuesta a los 25s.)
-    }, [messages, appState]);
+        if (answer || appState === 'PROCESSING') {
+            answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }, [answer, appState]);
 
     // ── TTS ───────────────────────────────────────────────────────────────
     const speakText = (text) => {
@@ -196,12 +349,9 @@ const ChatShell = () => {
         } catch (e) { console.warn('No se pudo reportar error:', e.message); }
     };
 
-    // ── Reinicio de conversación ───────────────────────────────────────────
-    // Limpia la vista y el estado en memoria del cliente. No hace falta avisar
-    // al backend: cada pregunta ya quedó registrada en analytics.jsonl en el
-    // momento en que se hizo, el reset no pierde ningún dato de esa sesión.
-    // Este chat no persiste historial en localStorage (vive solo en React
-    // state), así que no hay nada más que limpiar del lado del navegador.
+    // ── Reinicio ───────────────────────────────────────────────────────────
+    // Limpia la pregunta/respuesta en pantalla. Cada pregunta ya quedó registrada
+    // en analytics.jsonl al hacerse; el reset no pierde datos.
     const handleFullReset = useCallback(() => {
         if (synthRef.current) synthRef.current.cancel();
         if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch { /* noop */ } }
@@ -211,14 +361,16 @@ const ChatShell = () => {
         setConfirmingReset(false);
         setError(null);
         setInputValue('');
+        setPendingQuestion('');
         setProcessingStep(0);
         setAppState('IDLE');
         setMetrics({ consultas: 0, resueltas: 0 });
-        setMessages([{ id: newId(), role: 'bot', text: WELCOME }]);
+        setAnswer(null);
+        setFeedback(null);
+        setCopied(false);
     }, []);
 
-    // Doble-tap para confirmar (evita que un toque accidental sobre el botón
-    // público borre una conversación activa).
+    // Doble-tap para confirmar (evita que un toque accidental borre la respuesta).
     const handleResetClick = () => {
         if (confirmingReset) {
             clearTimeout(confirmResetTimerRef.current);
@@ -230,7 +382,7 @@ const ChatShell = () => {
     };
 
     // Auto-reinicio tras 5 minutos sin interacción: la siguiente persona en el
-    // kiosko empieza de cero, sin quedar expuesta la conversación anterior.
+    // kiosko empieza de cero, sin quedar expuesta la consulta anterior.
     useEffect(() => {
         const markInteraction = () => { lastInteractionRef.current = Date.now(); };
         window.addEventListener('mousemove', markInteraction);
@@ -243,33 +395,37 @@ const ChatShell = () => {
         };
     }, []);
 
+    const hasContent = Boolean(answer) || metrics.consultas > 0;
     useEffect(() => {
         const interval = setInterval(() => {
-            // Solo un mensaje (el de bienvenida) y sin actividad → ya está "en reposo".
-            if (messages.length <= 1) return;
+            if (!hasContent) return; // ya está "en reposo"
             if (Date.now() - lastInteractionRef.current >= INACTIVITY_RESET_MS) {
                 handleFullReset();
             }
         }, 10000);
         return () => clearInterval(interval);
-    }, [handleFullReset, messages.length]);
+    }, [handleFullReset, hasContent]);
 
     useEffect(() => {
-        return () => clearTimeout(confirmResetTimerRef.current);
+        return () => { clearTimeout(confirmResetTimerRef.current); clearTimeout(copiedTimerRef.current); };
     }, []);
 
     // ── Consulta (texto o voz) ────────────────────────────────────────────
     const handleQuery = async (rawQueryText) => {
-        // Truncado defensivo a 200 (cubre la entrada por VOZ, que puede sobrepasar
-        // el límite por dictado continuo). El input de texto ya está topado por
-        // maxLength. Preservamos el inicio: lo más relevante suele ir primero.
-        const queryText = (rawQueryText || '').slice(0, MAX_QUERY_LENGTH);
-        if (!queryText || queryText.trim().length < 2) return;
+        // Truncado defensivo a 200 (cubre la entrada por VOZ). El input de texto
+        // ya está topado por maxLength. Preservamos el inicio.
+        const queryText = (rawQueryText || '').slice(0, MAX_QUERY_LENGTH).trim();
+        if (!queryText || queryText.length < 2) return;
         if (isLocked.current) { console.warn('[ChatShell] Query concurrente ignorada'); return; }
         isLocked.current = true;
 
+        if (synthRef.current) synthRef.current.cancel();
         const qStart = performance.now();
-        setMessages(prev => [...prev, { id: newId(), role: 'user', text: queryText.trim() }]);
+        setInputValue(queryText); // la pregunta queda visible en el campo, como en el diseño
+        setPendingQuestion(queryText);
+        setAnswer(null);
+        setFeedback(null);
+        setCopied(false);
         setMetrics(m => ({ ...m, consultas: m.consultas + 1 }));
         setAppState('PROCESSING');
         setProcessingStep(1);
@@ -290,10 +446,11 @@ const ChatShell = () => {
             if (finalResult.toLowerCase() === 'ete') finalResult = 'Este';
             if (finalResult.toLowerCase().startsWith('te ')) finalResult = 'Este ' + finalResult.substring(3);
 
-            setMessages(prev => [...prev, { id: newId(), role: 'bot', text: finalResult, fresh: true }]);
+            const { body, sources } = splitAnswer(finalResult);
+            setAnswer({ question: queryText, body, sources, raw: finalResult });
             setMetrics(m => ({ ...m, resueltas: m.resueltas + 1 }));
-            // Salir de PROCESSING al instante (quita la burbuja en progreso) y leer.
-            if (synthRef.current) { setAppState('RESPONDING'); speakText(finalResult); }
+            // Se lee solo el cuerpo (no la lista de fuentes).
+            if (synthRef.current) { setAppState('RESPONDING'); speakText(body); }
             else setAppState('IDLE');
             console.log(`[ChatShell] ✅ Respuesta en ${(performance.now() - qStart).toFixed(0)}ms`);
         } catch (err) {
@@ -304,15 +461,45 @@ const ChatShell = () => {
         } finally {
             clearTimeout(step2); clearTimeout(step3);
             setProcessingStep(0);
+            setPendingQuestion('');
             isLocked.current = false;
         }
     };
 
     const submitInput = () => {
         const v = inputValue.trim();
-        if (!v) return;
-        setInputValue('');
+        if (!v) { inputRef.current?.focus(); return; }
         handleQuery(v);
+    };
+
+    const pickFaq = (q) => {
+        setIsFaqOpen(false);
+        handleQuery(q);
+    };
+
+    // ── Feedback y copiar ─────────────────────────────────────────────────
+    const sendFeedback = (value) => {
+        if (!answer || feedback) return;
+        setFeedback(value);
+        aiClient.logAnalytics('AnswerFeedback', {
+            useful: value === 'up',
+            query: answer.question,
+            answer: answer.body.slice(0, 500),
+            sources: answer.sources,
+            conversationId: aiClient.conversationId,
+        });
+    };
+
+    const handleCopy = async () => {
+        if (!answer) return;
+        const text = answer.sources.length
+            ? `${answer.body}\n\nInformación extraída de:\n${answer.sources.map(s => `- ${s}`).join('\n')}`
+            : answer.body;
+        const ok = await copyToClipboard(text);
+        if (!ok) { setError('No se pudo copiar la respuesta.'); return; }
+        setCopied(true);
+        clearTimeout(copiedTimerRef.current);
+        copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
     };
 
     // ── Visualizador de volumen (alimenta NexusCore) ──────────────────────
@@ -352,7 +539,7 @@ const ChatShell = () => {
         if (!SR) { setError('Tu navegador no soporta reconocimiento de voz.'); setAppState('IDLE'); return; }
 
         if (recognitionRef.current) {
-            try { recognitionRef.current.onresult = null; recognitionRef.current.onend = null; recognitionRef.current.onerror = null; recognitionRef.current.abort(); } catch (e) { /* ignore */ }
+            try { recognitionRef.current.onresult = null; recognitionRef.current.onend = null; recognitionRef.current.onerror = null; recognitionRef.current.abort(); } catch { /* ignore */ }
         }
         recognitionRef.current = new SR();
         recognitionRef.current.lang = 'es-MX';
@@ -363,7 +550,7 @@ const ChatShell = () => {
         recognitionRef.current.onresult = (e) => {
             const last = e.results.length - 1;
             const text = e.results[last][0].transcript;
-            if (e.results[last].isFinal) { recognitionRef.current.stop(); setInputValue(''); handleQuery(text); }
+            if (e.results[last].isFinal) { recognitionRef.current.stop(); handleQuery(text); }
             else setInputValue(text);
         };
         recognitionRef.current.onerror = async (e) => {
@@ -385,7 +572,7 @@ const ChatShell = () => {
             }
         };
         try { recognitionRef.current.start(); }
-        catch (e) { if (!isRetry) startListening(true); else setAppState('IDLE'); }
+        catch { if (!isRetry) startListening(true); else setAppState('IDLE'); }
     };
 
     const stopListening = () => {
@@ -444,12 +631,12 @@ const ChatShell = () => {
         if (secretClickRef.current === 1) setTimeout(() => { secretClickRef.current = 0; }, 2500);
     };
 
-    // ── Sub-estado en la burbuja en progreso ──────────────────────────────
-    const subStateText = processingStep === 1 ? 'Recibiendo solicitud…'
-        : processingStep === 2 ? 'Analizando información…'
-            : processingStep === 3 ? 'Generando respuesta…' : 'Procesando…';
+    const subStateText = processingStep === 1 ? 'Recibiendo tu pregunta…'
+        : processingStep === 2 ? 'Buscando en los documentos de la empresa…'
+            : processingStep === 3 ? 'Redactando la respuesta…' : 'Procesando…';
 
     const pendientes = Math.max(0, metrics.consultas - metrics.resueltas);
+    const isBusy = appState === 'PROCESSING';
 
     return (
         <div className="h-screen w-full flex flex-col overflow-hidden bg-bg-page text-ink">
@@ -457,15 +644,15 @@ const ChatShell = () => {
             {/* ── HEADER ─────────────────────────────────────────────── */}
             <motion.header
                 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="flex items-center justify-between px-6 h-16 bg-bg-panel border-b border-line shrink-0 z-10"
+                className="flex items-center justify-between gap-2 px-6 max-[520px]:px-3 h-16 bg-bg-panel border-b border-line shrink-0 z-10"
             >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                     <div onClick={handleSecretClick} className="cursor-pointer active:scale-95 transition-transform" title="Plastitec">
                         <CompanyLogo className="w-9 h-9" size={36} />
                     </div>
-                    <span className="text-[15px] font-medium text-ink">Tu <span className="text-brand font-medium">Asistente</span> de RRHH</span>
+                    <span className="text-[17px] max-[520px]:text-[15px] whitespace-nowrap font-medium text-ink">Tu <span className="text-brand font-medium">Asistente</span> de RRHH</span>
                     {/* NexusCore compacto (54px) reflejando el appState real */}
-                    <div className="relative w-[54px] h-[54px] rounded-full overflow-hidden flex items-center justify-center bg-surface border border-line shrink-0 ml-1" title={`Estado: ${appState.toLowerCase()}`}>
+                    <div className="relative w-[54px] h-[54px] rounded-full overflow-hidden flex items-center justify-center bg-surface border border-line shrink-0 ml-1 max-[520px]:hidden" title={`Estado: ${appState.toLowerCase()}`}>
                         <div className="absolute" style={{ width: 320, height: 320, transform: 'scale(0.22)' }}>
                             <NexusCore status={appState.toLowerCase()} volume={volume} />
                         </div>
@@ -475,20 +662,20 @@ const ChatShell = () => {
                     <button
                         onClick={() => setIsDocsOpen(true)}
                         title="¿Qué documentos conozco?"
-                        className="flex items-center gap-2 px-3.5 h-9 bg-surface border border-line rounded-lg text-[13px] font-medium text-ink hover:bg-brand-light hover:border-brand hover:text-brand transition-colors"
+                        className="flex items-center gap-2 px-4 h-10 bg-surface border border-line rounded-lg text-[14px] font-medium text-ink hover:bg-brand-light hover:border-brand hover:text-brand transition-colors"
                     >
                         <span>📄</span><span className="hidden sm:inline">Documentos</span>
                     </button>
                     <button
                         onClick={() => setIsGuideOpen(true)}
-                        className="flex items-center gap-2 px-3.5 h-9 bg-surface border border-line rounded-lg text-[13px] font-medium text-ink hover:bg-brand-light hover:border-brand hover:text-brand transition-colors"
+                        className="flex items-center gap-2 px-4 h-10 bg-surface border border-line rounded-lg text-[14px] font-medium text-ink hover:bg-brand-light hover:border-brand hover:text-brand transition-colors"
                     >
                         <span>💡</span><span className="hidden sm:inline">¿Cómo preguntar?</span>
                     </button>
                     <button
                         onClick={handleResetClick}
-                        title="Reiniciar conversación"
-                        className={`flex items-center gap-2 px-3.5 h-9 rounded-lg text-[13px] font-medium transition-colors border ${confirmingReset
+                        title="Limpiar la pregunta y la respuesta"
+                        className={`flex items-center gap-2 px-4 h-10 rounded-lg text-[14px] font-medium transition-colors border ${confirmingReset
                             ? 'text-white border-transparent'
                             : 'bg-surface border-line text-ink hover:bg-brand-light hover:border-brand hover:text-brand'
                             }`}
@@ -502,188 +689,207 @@ const ChatShell = () => {
             {/* ── CUERPO: 2 paneles ──────────────────────────────────── */}
             <div className="flex flex-1 overflow-hidden max-[880px]:flex-col max-[880px]:overflow-y-auto">
 
-                {/* PANEL IZQUIERDO — CHAT (56%) */}
+                {/* PANEL IZQUIERDO — PREGUNTA + RESPUESTA (57%) */}
                 <motion.section
                     initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.06, ease: 'easeOut' }}
-                    className="w-[56%] flex flex-col bg-bg-panel border-r border-line max-[880px]:w-full max-[880px]:h-[58vh] max-[880px]:border-r-0 max-[880px]:border-b"
+                    className="w-[57%] flex flex-col gap-5 p-5 overflow-y-auto custom-scrollbar bg-bg-page border-r border-line max-[880px]:w-full max-[880px]:overflow-visible max-[880px]:border-r-0"
                 >
-                    <div className="px-5 py-3 border-b border-line shrink-0">
-                        <h2 className="text-[13px] font-medium text-muted uppercase tracking-wider">Asistente</h2>
-                    </div>
+                    {/* ── Tarjeta: Haz tu pregunta ── */}
+                    <div className="rounded-2xl border border-line p-5 shrink-0" style={{ background: '#F4F7FB' }}>
+                        <div className="flex items-start gap-4 mb-5">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ background: '#E3EEFA', color: 'var(--color-brand)' }}>
+                                <ChatBubbleIcon />
+                            </div>
+                            <div>
+                                <h2 className="text-[18px] font-semibold text-ink leading-tight">Haz tu pregunta</h2>
+                                <p className="text-[14px] text-[#6B7280] mt-1">Escribe una sola pregunta sobre el Reglamento Interno, BPM, vacaciones, permisos, horarios y más.</p>
+                            </div>
+                        </div>
 
-                    {/* Mensajes */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar px-5 py-4 flex flex-col gap-2.5">
-                        {messages.map((m) => (
-                            <motion.div
-                                key={m.id}
-                                initial={{ opacity: 0, y: 8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.25, ease: 'easeOut' }}
-                                className={m.role === 'user' ? 'self-end max-w-[82%]' : 'self-start max-w-[82%]'}
-                            >
-                                <div className={`text-[11px] text-muted mb-0.5 ${m.role === 'user' ? 'text-right pr-1' : 'pl-1'}`}>
-                                    {m.role === 'user' ? 'Tú' : 'Asistente'}
-                                </div>
-                                <div className={m.role === 'user'
-                                    ? 'px-3.5 py-2.5 rounded-2xl rounded-br-sm bg-brand text-white leading-relaxed'
-                                    : 'px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-surface text-ink leading-relaxed'}>
-                                    {m.role === 'bot'
-                                        ? (m.fresh ? <TypewriterText text={m.text} speed={16} /> : m.text)
-                                        : m.text}
-                                </div>
-                                {/* Botón 🔊 repetir lectura (solo burbuja bot) */}
-                                {m.role === 'bot' && (
+                        <div className="flex items-stretch gap-4 max-[520px]:flex-col">
+                            <div className="flex-1 relative">
+                                <input
+                                    ref={inputRef}
+                                    type="text" autoComplete="off"
+                                    placeholder={appState === 'LISTENING' ? 'Escuchando…' : 'Ej: ¿Cuántos días de vacaciones tengo al año?'}
+                                    value={inputValue}
+                                    maxLength={MAX_QUERY_LENGTH}
+                                    onChange={e => setInputValue(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitInput(); } }}
+                                    disabled={appState === 'LISTENING' || isBusy}
+                                    className={`w-full h-[58px] pl-5 ${isSupported ? 'pr-14' : 'pr-5'} border-[1.5px] border-line rounded-xl text-[16px] bg-bg-panel text-ink outline-none transition-colors focus:border-brand placeholder:text-muted disabled:opacity-70`}
+                                />
+                                {isSupported && (
                                     <button
-                                        onClick={() => speakText(m.text)}
-                                        className="mt-1 ml-1 inline-flex items-center gap-1 text-[10px] text-muted hover:text-brand transition-colors"
-                                        title="Escuchar de nuevo"
+                                        onClick={micButtonClick}
+                                        disabled={isBusy}
+                                        className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 ${appState === 'LISTENING' ? 'bg-brand text-white' : 'text-muted hover:text-brand hover:bg-brand-light/40'}`}
+                                        title={appState === 'LISTENING' ? 'Detener' : 'Preguntar por voz'}
                                     >
-                                        <SpeakerIcon /> Escuchar
+                                        {appState === 'LISTENING' ? <StopIcon /> : <MicIcon />}
                                     </button>
                                 )}
-                            </motion.div>
-                        ))}
-
-                        {/* Burbuja en progreso con sub-estado (reemplaza el typing de 3 puntos) */}
-                        {appState === 'PROCESSING' && (
-                            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="self-start max-w-[82%]">
-                                <div className="text-[11px] text-muted mb-0.5 pl-1">Asistente</div>
-                                <div className="px-3.5 py-2.5 rounded-2xl rounded-bl-sm bg-surface text-muted leading-relaxed flex items-center gap-2">
-                                    <span className="flex items-end gap-[3px] h-3">
-                                        <span className="w-[5px] h-3 rounded-sm bg-brand-light origin-bottom animate-typing1" />
-                                        <span className="w-[5px] h-3 rounded-sm bg-brand-light origin-bottom animate-typing2" />
-                                        <span className="w-[5px] h-3 rounded-sm bg-brand-light origin-bottom animate-typing3" />
+                                {inputValue.length >= COUNTER_THRESHOLD && (
+                                    <span className="absolute right-3 bottom-[-18px] text-[10px] text-muted tabular-nums">
+                                        {inputValue.length}/{MAX_QUERY_LENGTH}
                                     </span>
-                                    <span className="text-[13px]">{subStateText}</span>
-                                </div>
-                            </motion.div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* Zona de voz */}
-                    <div className="px-5 py-2 border-t border-line flex items-center gap-2.5 bg-bg-panel shrink-0">
-                        <button
-                            onClick={micButtonClick}
-                            disabled={appState === 'PROCESSING' || !isSupported}
-                            className={`w-9 h-9 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${appState === 'LISTENING' ? 'border-brand bg-brand text-white' : 'border-line bg-bg-panel text-ink hover:border-brand hover:bg-brand-light'}`}
-                            title={isSupported ? 'Activar micrófono' : 'Voz no disponible — modo teclado'}
-                        >
-                            {appState === 'LISTENING' ? <StopIcon /> : <MicIcon />}
-                        </button>
-                        <div className={`flex items-end gap-[3px] h-[22px] transition-opacity ${appState === 'LISTENING' ? 'opacity-100' : 'opacity-0'}`}>
-                            {[
-                                { c: 'animate-wave1', h: 14 }, { c: 'animate-wave2', h: 20 }, { c: 'animate-wave3', h: 10 },
-                                { c: 'animate-wave4', h: 22 }, { c: 'animate-wave5', h: 12 }, { c: 'animate-wave6', h: 18 },
-                                { c: 'animate-wave7', h: 8 },
-                            ].map((bar, i) => (
-                                <div key={i} className={`w-[3px] rounded-sm bg-brand-light origin-bottom ${bar.c}`} style={{ height: bar.h }} />
-                            ))}
+                                )}
+                            </div>
+                            <button
+                                onClick={submitInput}
+                                disabled={isBusy || appState === 'LISTENING'}
+                                className="h-[58px] px-8 rounded-xl bg-brand hover:bg-brand-hover text-white text-[17px] font-medium flex items-center justify-center gap-3 transition-colors shrink-0 shadow-[0_2px_8px_rgba(24,95,165,0.25)] disabled:opacity-60"
+                            >
+                                <SendIcon /> {isBusy ? 'Consultando…' : 'Consultar'}
+                            </button>
                         </div>
-                        <span className={`text-xs transition-colors ${appState === 'LISTENING' ? 'text-brand font-medium' : 'text-muted'}`}>
-                            {!isSupported ? 'Modo teclado' : appState === 'LISTENING' ? 'Escuchando…' : 'Micrófono listo'}
-                        </span>
-                    </div>
 
-                    {/* Input */}
-                    <div className="px-5 pt-3 pb-2 flex items-center gap-2 bg-bg-panel shrink-0">
-                        <div className="flex-1 relative">
-                            <input
-                                type="text" placeholder="Escribe tu pregunta..." autoComplete="off"
-                                value={inputValue}
-                                maxLength={MAX_QUERY_LENGTH}
-                                onChange={e => setInputValue(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitInput(); } }}
-                                disabled={appState === 'LISTENING' || appState === 'PROCESSING'}
-                                className="w-full px-3.5 py-2.5 border-[1.5px] border-line rounded-[10px] text-sm bg-surface text-ink outline-none transition-colors focus:border-brand focus:bg-bg-panel placeholder:text-muted disabled:opacity-50"
-                            />
-                            {inputValue.length >= COUNTER_THRESHOLD && (
-                                <span className="absolute right-3 bottom-[-16px] text-[10px] text-muted tabular-nums">
-                                    {inputValue.length}/{MAX_QUERY_LENGTH}
-                                </span>
-                            )}
-                        </div>
-                        <button
-                            onClick={submitInput}
-                            disabled={appState === 'PROCESSING'}
-                            className="w-10 h-10 rounded-[10px] bg-brand hover:bg-brand-hover text-white flex items-center justify-center transition-colors shrink-0 disabled:opacity-50"
-                        >
-                            <SendIcon />
-                        </button>
-                    </div>
-
-                    {/* Disclaimer FIJO, persistente en todos los estados (item 18) */}
-                    <div className="px-5 pb-2 shrink-0">
-                        <p className="text-[11px] text-black text-center">
-                            📌 Asistente IA RRHH puede cometer errores. Por favor, verificar las respuestas. 📌
+                        <p className="flex items-center gap-2 text-[13px] text-[#6B7280] mt-5">
+                            <span className="text-[#6B7280]"><InfoIcon /></span>
+                            La IA responderá con base en los documentos de la empresa. Formula preguntas claras y específicas.
                         </p>
                     </div>
+
+                    {/* ── Tarjeta: Respuesta ── */}
+                    <div ref={answerRef} className="rounded-2xl border border-line bg-bg-panel p-5 shrink-0">
+                        <div className="flex items-start gap-4 mb-5">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--color-cat-teal-fill)', color: 'var(--color-cat-teal)' }}>
+                                <DocIcon />
+                            </div>
+                            <div>
+                                <h2 className="text-[18px] font-semibold text-ink leading-tight">Respuesta</h2>
+                                <p className="text-[14px] text-[#6B7280] mt-1">Información obtenida de los documentos de la empresa.</p>
+                            </div>
+                        </div>
+
+                        <AnimatePresence mode="wait">
+                            {isBusy ? (
+                                <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    className="rounded-xl border border-line p-6" style={{ background: '#FAFBFC' }}>
+                                    {pendingQuestion && <p className="text-[13px] text-muted mb-3">Pregunta: <span className="text-ink">{pendingQuestion}</span></p>}
+                                    <div className="flex items-center gap-3 text-[15px] text-[#6B7280]">
+                                        <span className="flex items-end gap-[3px] h-3.5">
+                                            <span className="w-[5px] h-3.5 rounded-sm bg-brand-light origin-bottom animate-typing1" />
+                                            <span className="w-[5px] h-3.5 rounded-sm bg-brand-light origin-bottom animate-typing2" />
+                                            <span className="w-[5px] h-3.5 rounded-sm bg-brand-light origin-bottom animate-typing3" />
+                                        </span>
+                                        {subStateText}
+                                    </div>
+                                </motion.div>
+                            ) : answer ? (
+                                <motion.div key={answer.raw} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                                    <div className="rounded-xl border border-line p-6" style={{ background: '#FAFBFC' }}>
+                                        <AnswerBody text={answer.body} />
+                                        {answer.sources.length > 0 && (
+                                            <div className="mt-5 pt-4 border-t border-line">
+                                                <p className="flex items-center gap-2 text-[14px] font-medium text-ink mb-2"><ClipIcon /> Información extraída de:</p>
+                                                <ul className="list-disc pl-11 flex flex-col gap-1 text-[15px] text-ink">
+                                                    {answer.sources.map((s, i) => <li key={i}>{s}</li>)}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
+                                        <div className="flex items-center gap-2.5">
+                                            {feedback ? (
+                                                <span className="text-[14px] text-[#6B7280]">
+                                                    {feedback === 'up' ? '¡Gracias! Nos alegra que te sirviera.' : 'Gracias, lo usaremos para mejorar.'}
+                                                </span>
+                                            ) : (
+                                                <>
+                                                    <span className="text-[14px] text-[#6B7280] mr-1">¿Esta respuesta fue útil?</span>
+                                                    <button onClick={() => sendFeedback('up')}
+                                                        className="inline-flex items-center gap-2 h-11 px-5 rounded-full text-[14px] font-medium transition-colors hover:brightness-95"
+                                                        style={{ background: 'var(--color-cat-teal-fill)', color: 'var(--color-cat-teal)' }}>
+                                                        <ThumbUpIcon /> Sí
+                                                    </button>
+                                                    <button onClick={() => sendFeedback('down')}
+                                                        className="inline-flex items-center gap-2 h-11 px-5 rounded-full text-[14px] font-medium transition-colors hover:brightness-95"
+                                                        style={{ background: '#FDECEC', color: '#C62828' }}>
+                                                        <ThumbDownIcon /> No
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {synthRef.current && (
+                                                <button onClick={() => speakText(answer.body)} title="Escuchar la respuesta"
+                                                    className="w-11 h-11 rounded-xl border border-line text-brand flex items-center justify-center hover:bg-brand-light/40 transition-colors">
+                                                    <SpeakerIcon />
+                                                </button>
+                                            )}
+                                            <button onClick={handleCopy}
+                                                className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border text-[14px] font-medium transition-colors"
+                                                style={{ background: '#EEF5FD', borderColor: '#CFE0F5', color: 'var(--color-brand)' }}>
+                                                <CopyIcon /> {copied ? 'Copiada ✓' : 'Copiar respuesta'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    className="rounded-xl border border-dashed border-line p-8 text-center" style={{ background: '#FAFBFC' }}>
+                                    <p className="text-[15px] text-[#6B7280]">Aquí aparecerá la respuesta a tu pregunta.</p>
+                                    <p className="text-[13px] text-muted mt-1">Cada consulta es independiente: si tienes otra duda, escríbela completa como una pregunta nueva.</p>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    <p className="text-[11px] text-muted text-center shrink-0 -mt-1">
+                        El asistente puede cometer errores. Verifica la información importante con Recursos Humanos.
+                    </p>
                 </motion.section>
 
-                {/* PANEL DERECHO — MÉTRICAS + FAQ (44%) */}
+                {/* PANEL DERECHO — MÉTRICAS + FAQ (43%) */}
                 <motion.aside
                     initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.12, ease: 'easeOut' }}
-                    className="w-[44%] flex flex-col bg-bg-page overflow-y-auto custom-scrollbar p-5 gap-5 max-[880px]:w-full"
+                    className="w-[43%] flex flex-col bg-bg-panel overflow-y-auto custom-scrollbar p-5 gap-5 max-[880px]:w-full max-[880px]:overflow-visible"
                 >
                     <div className="grid grid-cols-3 gap-3">
                         {[
-                            { label: 'Consultas hoy', value: metrics.consultas, dot: 'var(--color-brand-light)' },
-                            { label: 'Resueltas', value: metrics.resueltas, dot: 'var(--color-cat-teal-fill)' },
-                            { label: 'Pendientes', value: pendientes, dot: 'var(--color-cat-amber-fill)' },
+                            { label: 'Consultas hoy', value: metrics.consultas, dot: '#5B9BE0' },
+                            { label: 'Resueltas', value: metrics.resueltas, dot: '#7FD1AE' },
+                            { label: 'Pendientes', value: pendientes, dot: '#F2C46D' },
                         ].map((m, i) => (
-                            <div key={i} className="bg-bg-panel border border-line rounded-xl p-4 flex flex-col gap-1">
-                                <span className="text-[11px] font-medium text-muted uppercase tracking-wider">{m.label}</span>
-                                <motion.span key={m.value} initial={{ opacity: 0.4, y: 3 }} animate={{ opacity: 1, y: 0 }} className="text-[28px] font-medium text-ink leading-none">{m.value}</motion.span>
-                                <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: m.dot }} />
+                            <div key={i} className="bg-bg-panel border border-line rounded-xl p-4 flex flex-col gap-1.5">
+                                <span className="text-[12px] font-medium text-[#6B7280] uppercase tracking-wider">{m.label}</span>
+                                <motion.span key={m.value} initial={{ opacity: 0.4, y: 3 }} animate={{ opacity: 1, y: 0 }} className="text-[30px] font-medium text-ink leading-none mt-1">{m.value}</motion.span>
+                                <div className="w-2.5 h-2.5 rounded-full mt-2" style={{ background: m.dot }} />
                             </div>
                         ))}
                     </div>
 
-                    <div className="flex items-baseline gap-2">
-                        <h2 className="text-sm font-medium text-ink">Preguntas frecuentes</h2>
-                        <p className="text-xs text-muted">Toca para enviar al chat</p>
+                    <div className="flex items-baseline justify-between gap-2">
+                        <div className="flex items-baseline gap-3 flex-wrap">
+                            <h2 className="text-[17px] font-medium text-ink">Preguntas frecuentes</h2>
+                            <p className="text-[13px] text-[#6B7280]">Haz clic para usar como ejemplo</p>
+                        </div>
+                        <button onClick={() => setIsFaqOpen(true)} className="text-[14px] font-medium text-brand hover:underline whitespace-nowrap">
+                            Ver todas →
+                        </button>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 max-[640px]:grid-cols-1">
-                        {FAQS.map((faq, i) => {
-                            const c = CAT[faq.theme];
-                            const featured = i === 0;
-                            return (
-                                <button
-                                    key={i}
-                                    onClick={() => handleQuery(faq.q)}
-                                    disabled={appState === 'PROCESSING'}
-                                    className={`group relative overflow-hidden bg-bg-panel border border-line rounded-2xl p-4 flex items-start gap-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] disabled:opacity-60 disabled:pointer-events-none ${featured ? 'col-span-2 max-[640px]:col-span-1' : ''}`}
-                                    style={{ borderLeft: `3px solid ${c.color}` }}
-                                >
-                                    <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:rotate-6 group-hover:scale-105" style={{ background: c.fill, color: c.color }}>
-                                        <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">{ICONS[faq.icon]}</svg>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: c.color }}>{faq.cat}</div>
-                                        <div className="text-[13px] text-ink leading-snug mb-2">{faq.q}</div>
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface text-muted">
-                                            <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-                                            {faq.freq} consultas
-                                        </span>
-                                    </div>
-                                    {featured && <span className="absolute top-3 right-3 bg-brand text-white text-[10px] font-medium px-2 py-0.5 rounded-full tracking-wide">⭐ Popular</span>}
-                                </button>
-                            );
-                        })}
+                        {FAQS.slice(0, FAQ_VISIBLE).map((faq, i) => (
+                            <FaqCard key={i} faq={faq} featured={i === 0} onPick={pickFaq} disabled={isBusy} />
+                        ))}
                     </div>
                 </motion.aside>
             </div>
 
             {/* ── Footer global: aviso de fase de pruebas ────────────── */}
-            <div className="shrink-0 px-6 py-2 border-t border-line text-center" style={{ background: '#ffe9d3' }}>
-                <p className="text-[11px]" style={{ color: '#7a4a1e' }}>
-                    🧪 Este asistente se encuentra en <span className="font-medium">fase de pruebas</span>. Tu retroalimentación nos ayuda a mejorarlo.
+            <div className="shrink-0 px-6 py-2.5 border-t border-line text-center" style={{ background: '#FDF1E3' }}>
+                <p className="text-[13px]" style={{ color: '#7a4a1e' }}>
+                    ✏️ Este asistente se encuentra en fase de pruebas. Tu retroalimentación nos ayuda a mejorarlo.
                 </p>
             </div>
 
-            {/* ── Toast de error (re-skin claro) ─────────────────────── */}
+            {/* ── Toast de error ─────────────────────────────────────── */}
             <AnimatePresence>
                 {error && (
-                    <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-8 left-0 w-full flex justify-center z-[100] px-6">
+                    <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-12 left-0 w-full flex justify-center z-[100] px-6">
                         <div className="bg-bg-panel border border-cat-coral/30 text-ink px-6 py-3 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] flex items-center gap-3 max-w-lg">
                             <span className="text-lg">⚠️</span>
                             <span className="text-sm font-medium flex-1" style={{ color: 'var(--color-cat-coral)' }}>{error}</span>
@@ -693,7 +899,29 @@ const ChatShell = () => {
                 )}
             </AnimatePresence>
 
-            {/* ── Modal PIN admin (re-skin claro) ────────────────────── */}
+            {/* ── Modal: todas las preguntas frecuentes ──────────────── */}
+            <AnimatePresence>
+                {isFaqOpen && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[250] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm" onClick={() => setIsFaqOpen(false)}>
+                        <motion.div initial={{ scale: 0.95, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 12 }}
+                            className="bg-bg-panel border border-line rounded-2xl p-6 max-w-3xl w-full shadow-2xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between mb-5 shrink-0">
+                                <div>
+                                    <h2 className="text-lg font-medium text-ink">Preguntas frecuentes</h2>
+                                    <p className="text-[13px] text-[#6B7280] mt-0.5">Haz clic en una para consultarla</p>
+                                </div>
+                                <button onClick={() => setIsFaqOpen(false)} className="w-10 h-10 flex items-center justify-center bg-surface hover:bg-line border border-line rounded-full text-muted hover:text-ink transition-all text-xl">✕</button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 overflow-y-auto custom-scrollbar max-[640px]:grid-cols-1">
+                                {FAQS.map((faq, i) => <FaqCard key={i} faq={faq} featured={i === 0} onPick={pickFaq} disabled={isBusy} />)}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ── Modal PIN admin ────────────────────────────────────── */}
             <AnimatePresence>
                 {showPinModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

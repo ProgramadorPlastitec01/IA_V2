@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { matchSlangRules } from '../config/slangRules.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,6 +81,17 @@ export const SPELL_VARIANTS = {
     // ── Buenas Prácticas de Manufactura (2026-08-13) ───────────────────
     'manufctura':          'manufactura',
     'manufatura':          'manufactura',
+
+    // ── Abreviaturas de chat (glosario de jerga, 2026-10-08) ──────────────
+    'q':                   'que',
+    'xq':                  'porque',
+    'pq':                  'porque',
+    'porq':                'porque',
+    'pa':                  'para',
+    'tb':                  'también',
+    'tmb':                 'también',
+    'dnd':                 'dónde',
+    'vacas':               'vacaciones',      // "¿cuándo salgo a vacas?"
 };
 
 // Pre-calcular frases compuestas (claves con espacio) para búsqueda eficiente
@@ -190,6 +202,19 @@ class QueryUnderstandingService {
     }
 
     /**
+     * true si `term` aparece en `text` como palabra/frase completa
+     * (no como subcadena de otra palabra). Ambos ya en minúsculas.
+     * Admite plural en la última palabra ("queja" → "quejas",
+     * "conflicto de interes" → "conflicto de intereses"), pero no prefijos
+     * ni infijos: "turno" ya no matchea "nocturno", "ética" no matchea
+     * "estéticas", "tomar" no matchea "retomar".
+     */
+    _containsWholeTerm(text, term) {
+        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?:e?s)?(?![\\p{L}\\p{N}])`, 'u').test(text);
+    }
+
+    /**
      * Interpreta la query antes del retrieval:
      *   1. Normalización ortográfica (NUEVA — SPELL_VARIANTS)
      *   2. Expansión de acrónimos y términos corporativos (original, intacta)
@@ -225,12 +250,26 @@ class QueryUnderstandingService {
             }
         }
 
-        // Check terms
+        // Check terms — coincidencia por PALABRA COMPLETA (2026-10-08).
+        // Antes era lowerQuery.includes(term): "tomar" matcheaba dentro de
+        // "retomar" y cualquier uso de "tomar" ("puedo tomar esto como
+        // incapacidad") inyectaba alcohol/embriaguez en la búsqueda.
+        // \b de JS no reconoce letras acentuadas, por eso se usan lookarounds
+        // Unicode: el término no puede ir pegado a otra letra o dígito.
         for (const [term, expansions] of Object.entries(this.vocabulary.terms)) {
-            if (lowerQuery.includes(term.toLowerCase())) {
+            if (this._containsWholeTerm(lowerQuery, term.toLowerCase())) {
                 expandedTermsSet.add(term);
                 expansions.forEach(exp => expandedTermsSet.add(exp));
             }
+        }
+
+        // Jerga colombiana con contexto (config/slangRules.js, 2026-10-08):
+        // "me echaron" → despido, "mi cucha está enferma" → calamidad doméstica…
+        const slang = matchSlangRules(originalQuery);
+        const interpretation_hints = slang.hints;
+        if (slang.rules.length > 0) {
+            slang.expansions.forEach(e => expandedTermsSet.add(e));
+            console.log(`[QueryUnderstanding] Jerga: ${slang.rules.join(', ')} → ${slang.expansions.join(', ')}`);
         }
 
         const expanded_terms = Array.from(expandedTermsSet);
@@ -251,6 +290,7 @@ class QueryUnderstandingService {
             expanded_query,
             expanded_terms,
             normalizedTerms,
+            interpretation_hints,
         };
     }
 }

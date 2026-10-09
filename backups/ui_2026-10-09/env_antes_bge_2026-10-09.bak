@@ -1,0 +1,70 @@
+# Backend Server Configuration
+PORT=3000
+NODE_ENV=development
+
+# CORS Configuration
+# Comma-separated list of allowed origins
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:5180,http://172.16.1.164:5180
+
+# NotebookLM Configuration
+# Name of the RRHH notebook in NotebookLM
+NOTEBOOK_NAME=RRHH
+
+# Google Cloud Text-to-Speech Configuration
+# 1. Create a project at: https://console.cloud.google.com/
+# 2. Enable "Cloud Text-to-Speech API"
+# 3. Create a service account with role "Cloud Text-to-Speech User"
+# 4. Download JSON key file and save it in the project root
+# 5. Set the path to the JSON file below
+GOOGLE_APPLICATION_CREDENTIALS=./google-credentials.json
+
+# Optional: Logging
+LOG_LEVEL=info
+
+# ── SQLite (2026-06-17, split lectura/escritura 2026-08-14) ───────────────────
+# CACHE_READ_ENABLED=false: cada consulta sigue yendo FRESCA al RAG — nunca se
+#   responde desde una entrada ya guardada. Motivo histórico del OFF: la
+#   similitud Dice matcheaba preguntas no equivalentes (cruce de contexto) y
+#   congelaba respuestas de baja calidad.
+# CACHE_WRITE_ENABLED=true: cada respuesta de RAG con contenido real SÍ se
+#   guarda en knowledge_base (pregunta, respuesta, confianza, IP) para
+#   análisis/auditoría posterior — no se usa para responder.
+CACHE_READ_ENABLED=false
+CACHE_WRITE_ENABLED=true
+
+# Límite de longitud de consulta (defensa de backend; el frontend también valida)
+MAX_QUERY_LENGTH=200
+
+# Optional: Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Qdrant Configuration
+QDRANT_URL=http://localhost:6333
+# 2026-10-09: plastitec_docs quedó con segmentos bloqueados (rename "Acceso denegado" en Windows).
+# Producción usa la copia limpia plastitec_docs_p0 (mismo contenido, max_optimization_threads=0).
+QDRANT_COLLECTION=plastitec_docs_p0
+
+# Ollama Configuration
+OLLAMA_URL=http://localhost:11434
+# 2026-10-09: qwen2.5 7B Instruct reemplaza a llama3.2 (piloto: alucinaciones 44→13 de 150).
+# Para volver atrás: OLLAMA_MODEL=llama3.2 y borrar las 3 líneas LLM_PROMPT_STYLE/OLLAMA_NUM_CTX/LLM_SKIP_REASONING.
+OLLAMA_MODEL=qwen2.5:latest
+LLM_PROMPT_STYLE=chat
+OLLAMA_NUM_CTX=8192
+LLM_SKIP_REASONING=true
+# Respaldo = mismo modelo: otro modelo (gemma 5 GB) no cabe en la GPU junto a qwen + embeddings.
+OLLAMA_FALLBACK_MODEL=qwen2.5:latest
+OLLAMA_EMBED_MODEL=mxbai-embed-large
+LOCAL_EMBEDDING_DIMENSION=1024
+
+# Security
+ADMIN_PIN_HASH=61933cb5d254ef168efd91a28a7e504af31913c015a2f20a66cb2ac303909612
+ADMIN_PIN_SALT=02997ae3468f85d8bcbbe01a02f1f84cdf465712c43f0692
+
+# ── Fase 2.5.1: Neural Reranking (Cross-Encoder POC) ──────────────────────────
+# PRODUCCIÓN: Mantener en false. Activar solo para benchmark/pruebas.
+ENABLE_NEURAL_RERANKER=false
+NEURAL_RERANKER_MODEL=Xenova/bge-reranker-base
+NEURAL_TOP_INPUT=6
+NEURAL_TOP_OUTPUT=4

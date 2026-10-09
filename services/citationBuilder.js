@@ -2,12 +2,15 @@
  * Citation Builder — Fase 3.0
  *
  * Comportamiento:
- *  - Por defecto: NO muestra fuentes (experiencia conversacional natural).
- *  - Si confidence < CONFIDENCE_THRESHOLD: muestra fuentes automáticamente.
- *  - Si showSources=true (petición explícita del usuario): muestra fuentes detalladas.
+ *  - Siempre muestra fuentes (2026-10-09). Antes se ocultaban con confianza
+ *    ≥ 0.70 ("experiencia conversacional"), pero la UI pasó a formato
+ *    pregunta→respuesta con sección "Información extraída de", y la confianza
+ *    de retrieval no predice la calidad (regresión SQLite: r≈0.19; 24
+ *    respuestas salieron sin fuentes, varias incorrectas).
+ *  - Si showSources=true (petición explícita del usuario): etiqueta "Fuente:".
  */
 
-const CONFIDENCE_THRESHOLD = 0.70; // Por debajo de esto se muestran fuentes automáticamente
+const CONFIDENCE_THRESHOLD = Infinity; // fuentes siempre visibles (ver arriba)
 
 // Mapeo de nombre técnico de archivo → nombre humano legible (un solo lugar).
 // El match es por subcadena del código de documento, robusto a sufijos de

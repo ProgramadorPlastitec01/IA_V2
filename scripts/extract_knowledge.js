@@ -7,12 +7,14 @@ import { KnowledgeExtractionService } from '../services/knowledgeExtractionServi
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 const KNOWLEDGE_DIR = path.join(__dirname, '..', 'knowledge');
 const LOGS_DIR = path.join(__dirname, '..', 'logs');
 const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
-const COLLECTION = 'plastitec_docs';
+const COLLECTION = process.env.QDRANT_COLLECTION || 'plastitec_docs_p0';
 
 const TARGET_DOCS = [
     { id: 'ETICA_RAG', query: 'I-RH-017-5' },

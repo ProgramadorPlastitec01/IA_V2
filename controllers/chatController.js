@@ -225,6 +225,30 @@ export const postQuery = async (req, res) => {
         // desalinea bajo escritura concurrente (2 tablets).
         const finalConversationId = conversationId || crypto.randomUUID();
         const finalResponseText = stripFabricatedNote(query, responseText);
+
+        // ── Registro de preguntas SIN respuesta (2026-10-08) ─────────────────
+        // La rama `ragResult.error === 'no_context'` de arriba nunca se activa
+        // (ragService devuelve NO_MATCH como `answer`, sin campo `error`), así
+        // que el panel de analytics reportaba 0 preguntas sin respuesta aunque
+        // ~22% de las respuestas eran "No encontré información…". Se registra
+        // aquí, además de RAGQueryMetrics (que sigue contando el total).
+        const NO_ANSWER_REASONS = [
+            [SYSTEM_MESSAGES.NO_MATCH,             'no_match'],
+            [SYSTEM_MESSAGES.INSUFFICIENT_CONTEXT, 'insufficient_context'],
+            [SYSTEM_MESSAGES.NOT_UNDERSTOOD,       'not_understood'],
+            [`${SYSTEM_MESSAGES.UNSUPPORTED_PREMISE_PREFIX} «`, 'unsupported_premise'],
+        ];
+        const noAnswer = NO_ANSWER_REASONS.find(([msg]) => finalResponseText && finalResponseText.trim().startsWith(msg));
+        if (noAnswer) {
+            logAnalyticsEvent('UnansweredQuery', {
+                conversationId: finalConversationId,
+                clientIp: req.ip,
+                query,
+                response: finalResponseText,
+                reason: noAnswer[1],
+                maxScore: ragResult.qdrantResults?.[0]?.score || 0
+            });
+        }
         logAnalyticsEvent('RAGQueryMetrics', {
             conversationId: finalConversationId,
             clientIp: req.ip,

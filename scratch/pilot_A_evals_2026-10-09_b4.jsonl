@@ -1,0 +1,25 @@
+{"i":70,"cls":"PARCIAL","note":"80% desde el 1-jul-2025 y 90% desde el 1-jul-2026: correcto, pero omite el 100% desde el 1-jul-2027 (la lista queda corta)."}
+{"i":71,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no regulan a los externos. Corrige la cita inventada del art.1 de la base."}
+{"i":72,"cls":"CORRECTA","note":"2 semanas y Registro Civil ante la EPS en 30 días (art.47 num.5). No menciona la ampliación hasta 5 semanas (no se preguntaba)."}
+{"i":73,"cls":"CORRECTA","note":"Art.77 num.18 y Ley 2191 de 2022, con el alcance de la obligación."}
+{"i":74,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El preaviso de 30 días del art.4 no llegó al contexto (retrieval). Mejor que la malinterpretación de la base."}
+{"i":75,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no tienen un trámite específico para la incapacidad de un hijo. El contexto traía el art.46 (calamidad doméstica), pero no el art.49. Abstención aceptable, mejor que el art.61 distorsionado de la base."}
+{"i":76,"cls":"PARCIAL","note":"Define bien el acoso (art.126) y remite al art.128, pero no usa el art.129 (no es acoso ejercer la potestad disciplinaria), que resolvía el caso. Corrige el rechazo indebido por premisa de la base."}
+{"i":77,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no regulan la venta 'fuera'; las rifas y colectas (art.81 num.7) no llegaron al contexto. Corrige la cita inventada del art.81 de la base."}
+{"i":78,"cls":"NO RESPONDE PERO DEBERÍA","note":"Pregunta compuesta. El área receptora no está en el .md (hueco de contenido), pero la 2.ª parte sí estaba en el contexto (§15: falta grave → medida disciplinaria o terminación con justa causa). Debió responderla. Al menos ya no inventa el área."}
+{"i":79,"cls":"NO RESPONDE PERO DEBERÍA","note":"Respuesta VACÍA: 'ha implementado los siguientes sistemas:' y luego nada. SAGRILAFT y OEA estaban en el contexto (conf 1.0). Truncamiento en el post-procesado. EMPEORA frente a la base (CORRECTA)."}
+{"i":80,"cls":"PARCIAL","note":"El contenido es correcto (arts. 90/92 del RIT: definición; comunicarlo por escrito a la Gerencia o RRHH), pero lo atribuye falsamente al 'Código de Ética', que no lo define. Omite las tipologías del Código."}
+{"i":81,"cls":"PARCIAL","note":"Confidencialidad durante y después de la relación (Código §12 y RIT art.84): correcto y detallado. Omite la propiedad intelectual (Código §13), que también se preguntaba."}
+{"i":82,"cls":"PARCIAL","note":"Respuesta TRUNCADA: da las tres categorías y los ejemplos de áreas negras, pero se corta en 'Ejemplos de áreas grises:'. Faltan grises y blancas."}
+{"i":83,"cls":"CORRECTA","note":"Reglas del I-RH-003 completas."}
+{"i":84,"cls":"PARCIAL","note":"Joyas, maquillaje y celular: correcto. Pero afirma FALSAMENTE que 'no se mencionan restricciones sobre alimentos, bebidas u otras sustancias' (el BPM prohíbe fumar, beber, alimentos, bebidas, medicamentos, alcohol/SPA)."}
+{"i":85,"cls":"CORRECTA","note":"Misión y visión del I-RH-001."}
+{"i":86,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no regulan la devolución de la dotación. Corrige la alucinación de la base sobre el art.58."}
+{"i":87,"cls":"CORRECTA","note":"ISO 9001/2004/BVQI e ISO 13485/2018/ICONTEC (omite que la 9001 se mantuvo hasta 2018)."}
+{"i":88,"cls":"PARCIAL","note":"Gerente y Director Técnico correctos. La Directora de RRHH queda TRUNCADA en 'Aura Ma.' (es Aura Ma. Niño Mejía): corte en el punto de la abreviatura. Mejora frente a la base (falso negativo)."}
+{"i":89,"cls":"CORRECTA","note":"Las cuatro áreas de proceso y las operaciones de Producción Farmacéutica (I-RH-001)."}
+{"i":90,"cls":"CORRECTA","note":"Cinco beneficios del I-RH-001 (la lista se corta tras el 5.º con '…', pero cumple lo pedido)."}
+{"i":91,"cls":"CORRECTA","note":"7:30-5:00 L-J y 7:30-4:30 el viernes (art.23 §22.1 vigente). Corrige el error del viernes de la base."}
+{"i":92,"cls":"CORRECTA","note":"Pasos 1-5 del I-RH-011 en orden."}
+{"i":93,"cls":"CORRECTA","note":"Locker asignado, zapatos en bolsa plástica (I-RH-009/011)."}
+{"i":94,"cls":"PARCIAL","note":"Orden cofia/auditiva → uniforme → polainas → guantes correcto, pero omite la blusa blanca, numera mal los pasos (uniforme es el 6, polainas el 7, guantes el 10) y dice 'la escafandra al salir'."}

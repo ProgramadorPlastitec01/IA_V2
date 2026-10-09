@@ -201,7 +201,9 @@ El Servicio Nacional de Aprendizaje, SENA, deberá pronunciarse sobre la solicit
 
 En todo caso, la respuesta negativa por parte de la entidad deberá estar motivada con las razones por las cuales no se cumplen adecuadamente los requisitos o indicar de manera expresa las exigencias que deben ser subsanadas por la empresa para acceder a la autorización.
 
-ARTICULO 19. DISTRIBUCIÓN Y ALTERNANCIA DE TIEMPO ENTRE LA ETAPA LECTIVA Y PRODUCTIVA. La empresa y la entidad de formación podrán determinar la duración de la etapa productiva, al igual que su alternancia con la lectiva, de acuerdo con las necesidades de la formación del aprendiz y los requerimientos de la empresa. Para los técnicos o tecnólogos será de un (1) año.
+### ARTICULO 19. DISTRIBUCIÓN Y ALTERNANCIA DE TIEMPO ENTRE LA ETAPA LECTIVA Y PRODUCTIVA.
+
+La empresa y la entidad de formación podrán determinar la duración de la etapa productiva, al igual que su alternancia con la lectiva, de acuerdo con las necesidades de la formación del aprendiz y los requerimientos de la empresa. Para los técnicos o tecnólogos será de un (1) año.
 
 La duración de formación de los programas de formación del SENA será la que señale el Director General de esta Institución, previo concepto del Comité de Formación Profesional Integral.
 
@@ -215,11 +217,15 @@ En este esquema, la alternancia entre los ambientes de aprendizaje de la institu
 
 El tiempo correspondiente a la fase práctica o dual deberá ser certificado por la empresa y se reconocerá como experiencia laboral válida para el aprendiz.
 
-ARTICULO 20. TRABAJADORES CON LIMITACIONES. Los empleadores que ocupen trabajadores con limitación no inferior al 25% comprobada y que están obligados a presentar declaración de renta y complementarios, tienen derecho a deducir de la renta el 200% del valor de los salarios y prestaciones sociales pagados durante el año o periodo gravable a los trabajadores con limitación, mientras ésta subsista.
+### ARTICULO 20. TRABAJADORES CON LIMITACIONES.
+
+Los empleadores que ocupen trabajadores con limitación no inferior al 25% comprobada y que están obligados a presentar declaración de renta y complementarios, tienen derecho a deducir de la renta el 200% del valor de los salarios y prestaciones sociales pagados durante el año o periodo gravable a los trabajadores con limitación, mientras ésta subsista.
 
 PAR. La cuota de aprendices que está obligado a contratar el empleador se disminuirá en un 50%, si los contratados por él son personas con discapacidad comprobada no inferior al 25%. (Ley 361 de 1997)
 
-ARTICULO 21. RÉGIMEN APLICABLE AL CONTRATO DE APRENDIZAJE. El contrato de aprendizaje se regirá por lo dispuesto en el Decreto 0223 del 5 de marzo de 2026, mediante el cual se reglamentan las prácticas laborales y el contrato de aprendizaje, así como por las normas que lo modifiquen, adicionen o sustituyan.
+### ARTICULO 21. RÉGIMEN APLICABLE AL CONTRATO DE APRENDIZAJE.
+
+El contrato de aprendizaje se regirá por lo dispuesto en el Decreto 0223 del 5 de marzo de 2026, mediante el cual se reglamentan las prácticas laborales y el contrato de aprendizaje, así como por las normas que lo modifiquen, adicionen o sustituyan.
 
 PARÁGRAFO 1. (Adicionado conforme al Decreto 0223 del 5 de marzo de 2026 y la Circular Externa 0083 del 18 de julio de 2025 del Ministerio del Trabajo). El contrato de aprendizaje es un contrato laboral especial a término fijo regido por el Código Sustantivo del Trabajo, los tratados internacionales ratificados por Colombia y el presente Reglamento. Durante la fase práctica o la formación dual, el aprendiz tendrá derecho al reconocimiento y pago de prestaciones sociales (cesantías, intereses a las cesantías, prima de servicios, vacaciones), dotación, auxilio de transporte cuando devengue hasta dos (2) salarios mínimos, subsidio familiar y afiliación completa al Sistema de Seguridad Social Integral (salud, pensión y riesgos laborales), con aportes a cargo de la empresa patrocinadora.
 
@@ -527,9 +533,9 @@ PLASTITEC concederá a sus trabajadores los permisos necesarios para el ejercici
 
 #### LICENCIAS REMUNERADAS
 
-### ARTÍCULO 4
+### ARTÍCULO 47.
 
-7. Estas licencias son el derecho de todos los empleados a un tiempo remunerado en el que no tienen que trabajar y que se derivan de la maternidad, paternidad o fallecimiento de un familiar, cónyuge o compañero permanente según lo establecido en la ley, así:
+Estas licencias son el derecho de todos los empleados a un tiempo remunerado en el que no tienen que trabajar y que se derivan de la maternidad, paternidad o fallecimiento de un familiar, cónyuge o compañero permanente según lo establecido en la ley, así:
 
 1.  **LICENCIA DE MATERNIDAD PREPARTO**. Se trata de una licencia remunerada a la que tienen derecho todas las empleadas de PLASTITEC en estado de embarazo y consiste en una (1) semana de descanso previa a la fecha probable del parto debidamente acreditada. Si por alguna razón médica la futura madre requiere una semana adicional previa al parto podrá gozar de las dos (2) semanas, con dieciséis (16) posparto. Si en caso diferente, por razón médica no puede tomar la semana previa al parto, podrá disfrutar las dieciocho (18) semanas en el posparto inmediato. Para hacer efectiva esta licencia la empleada debe entregar ante la area de Recursos Humanos según el trámite y requisitos exigidos de acuerdo a la Ley, para el reconocimiento de la prestación.
 
@@ -680,7 +686,9 @@ Se denomina jornal el salario estipulado por días y sueldo, el estipulado por p
 
 Salvo convenio por escrito, el pago de los salarios se efectuará en el lugar en donde el trabajador presta sus servicios, durante el trabajo o inmediatamente después que éste cese. (Artículo 138, numeral primero, Código Sustantivo del Trabajo).
 
-**ARTCULO 54. PERIODOS DE PAGO:** El salario se pagará al trabajador una vez al mes, el pago del salario se hace de forma mensual al finalizar cada mes; la forma de hacerlo es mediante consignación electrónica del monto en la cuenta bancaria que escoja el empleado (esta cuenta deberá ser de un banco o corporación establecida en Colombia), o se girará el cheque respectivo directamente al trabajador o a la persona que él autorice por escrito.
+### ARTICULO 54. PERIODOS DE PAGO.
+
+El salario se pagará al trabajador una vez al mes, el pago del salario se hace de forma mensual al finalizar cada mes; la forma de hacerlo es mediante consignación electrónica del monto en la cuenta bancaria que escoja el empleado (esta cuenta deberá ser de un banco o corporación establecida en Colombia), o se girará el cheque respectivo directamente al trabajador o a la persona que él autorice por escrito.
 
 ### ARTICULO 55.
 
@@ -1700,9 +1708,9 @@ El trabajador que se considere perjudicado por algún hecho relacionado con el t
 
 Se considerarán situaciones agravantes de la falta aquellos casos en los cuales la conducta del trabajador infringe las normas de la empresa de manera más grave o con mayor repercusión para la organización, especialmente cuando se verifique que la conducta fue realizada con intención, dolo o negligencia grave.
 
-### ARTÍCULO 10
+### ARTÍCULO 105.
 
-5. Se establecen las siguientes situaciones agravantes:
+Se establecen las siguientes situaciones agravantes:
 
 1.  Repetición de la falta: Cuando un trabajador comete la misma falta en más de una ocasión, aumentando así la gravedad de su conducta. También se entenderá como agravante cuando el trabajador tiene antecedentes de faltas laborales dentro de los últimos dos años.
 
@@ -2054,9 +2062,9 @@ h.  Las exigencias de cumplir con las estipulaciones contenidas en los reglament
 
 Los mecanismos de prevención de las conductas de acoso laboral previstos por PLASTITEC constituyen actividades tendientes a generar una conciencia colectiva conviviente, que promueva el trabajo en condiciones dignas y justas, la armonía entre quienes comparten vida laboral empresarial y el buen ambiente en PLASTITEC y proteja la intimidad, la honra, la salud mental y la libertad de las personas en el trabajo.
 
-### ARTÍCULO
+### ARTÍCULO 131.
 
-**131**. En desarrollo del propósito a que se refiere el artículo anterior, PLASTITEC ha previsto los siguientes mecanismos:
+En desarrollo del propósito a que se refiere el artículo anterior, PLASTITEC ha previsto los siguientes mecanismos:
 
 1. Información a los trabajadores sobre la Ley 1010 de 2006, que incluya campañas de divulgación preventiva, conversatorios y capacitaciones sobre el contenido de dicha ley, particularmente en relación con las conductas que constituyen acoso laboral, las que no, las circunstancias agravantes, las conductas atenuantes y el tratamiento sancionatorio.
 

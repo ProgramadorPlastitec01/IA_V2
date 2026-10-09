@@ -1,0 +1,25 @@
+{"i":45,"cls":"PARCIAL","note":"Dice bien que el recargo empieza a las 7 p.m., pero afirma que no encuentra hasta qué hora va. El contexto traía el art.29 (nocturno de 7:00 p.m. a 6:00 a.m.): omisión con el dato a la vista."}
+{"i":46,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene aunque el contexto traía el art.39 par. (operativo: 6 días hábiles) y el art.24 (descanso del sábado)."}
+{"i":47,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs."}
+{"i":48,"cls":"PARCIAL","note":"Seguimiento sin contexto. Responde con el horario administrativo vigente (bien etiquetado), pero 'lunes a viernes 7:30-5:00' ignora que el viernes es hasta 4:30. Debió pedir aclaración."}
+{"i":49,"cls":"NO RESPONDE CORRECTAMENTE","note":"Bloqueo de privacidad justificado (igual que la base)."}
+{"i":50,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.39 (15 días hábiles por año de servicio) no llegó al contexto (retrieval)."}
+{"i":51,"cls":"INCORRECTA","note":"Presenta los HORARIOS UNO/DOS derogados como 'los dos horarios principales' de la empresa. Omite el vigente y los turnos. Empeora frente a la base (vaga pero no falsa)."}
+{"i":52,"cls":"NO RESPONDE CORRECTAMENTE","note":"No está en los docs. Mejora frente a la base, que inventaba la franja."}
+{"i":53,"cls":"INCORRECTA","note":"Presenta el horario ADMINISTRATIVO como horario del personal operativo (que va por turnos según el §22.2) y lo arma mal ('viernes mañana 7:30 a 4:30, almuerzo 1-2'). Conf 0.75. Empeora frente a la base."}
+{"i":54,"cls":"CORRECTA","note":"Recargo dominical del 90% desde el 1-jul-2026, progresivo (art.35 par.3). Mejora frente a la base."}
+{"i":55,"cls":"PARCIAL","note":"Convierte la pregunta en 'acoso sexual' y aplica el art.139. No menciona el Comité de Convivencia Laboral ni el trámite del art.136 para acoso laboral."}
+{"i":56,"cls":"CORRECTA","note":"Jornada flexible del art.23 par.5 b) (por acuerdo, máx. 9 h/día, promedio 42 h, franja 6am-7pm). Corrige el rechazo indebido por premisa de la base."}
+{"i":57,"cls":"PARCIAL","note":"Reduce el art.23 a la tabla de reducción de jornada (44 → 42 h). Omite horarios, turnos y descansos."}
+{"i":58,"cls":"PARCIAL","note":"Bien que en los contratos fijos <1 año hay vacaciones proporcionales (art.45 par., citando la Ley 50/1990 art.3 par.), pero concluye 'sí puedes pedir vacaciones' cuando la norma habla del PAGO proporcional. El régimen general (art.39) exige 1 año."}
+{"i":59,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no dicen si son obligatorias; solo que deben estar autorizadas (art.32 par.2). Abstención aceptable, mejor que el non sequitur de la base. Podía mencionar la autorización, que estaba en el contexto."}
+{"i":60,"cls":"NO RESPONDE CORRECTAMENTE","note":"Los docs no clasifican el cargo de técnico. Mejora frente a la base, que lo suponía administrativo."}
+{"i":61,"cls":"INCORRECTA","note":"Llama 'personal operativo' al técnico de TI y le asigna una mezcla de los horarios derogados ('07:00 a 05:00 L-J, viernes 4 PM, según el horario uno')."}
+{"i":62,"cls":"PARCIAL","note":"Maternidad, paternidad, luto y embarazo. Omite lactancia, licencias parentales, citas médicas, acompañamiento escolar y citaciones judiciales (art.47 num.4, 8-10)."}
+{"i":63,"cls":"CORRECTA","note":"Art.47 num.5: 2 semanas, ampliables a 5 según el desempleo."}
+{"i":64,"cls":"NO RESPONDE CORRECTAMENTE","note":"'Gran Servicios' no aparece en los docs."}
+{"i":65,"cls":"NO RESPONDE PERO DEBERÍA","note":"Se abstiene. El art.71 lit. n) (funciones del cargo y las conexas o complementarias) existe pero no llegó al contexto. Mejor que la cita inventada del art.123 de la base."}
+{"i":66,"cls":"CORRECTA","note":"Art.40 literal: época fijada por la empresa, concesión oficiosa o a petición, aviso con 15 días de anticipación. Mejora frente a la base."}
+{"i":67,"cls":"CORRECTA","note":"Art.8 (máx. 2 meses) y art.9 (si continúa tras expirar, el contrato rige desde el inicio). Redacción algo confusa ('la no renovación')."}
+{"i":68,"cls":"NO RESPONDE CORRECTAMENTE","note":"No hay procedimiento de día no remunerado en los docs (el conducto regular del art.101 B-V no llegó al contexto). Abstención aceptable."}
+{"i":69,"cls":"CORRECTA","note":"Art.58: 30-abr, 30-ago, 30-dic, hasta 2 SMMLV."}
