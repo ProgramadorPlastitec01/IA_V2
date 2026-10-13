@@ -600,6 +600,10 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
         }
 
         let b2RemovedPhrase = false; // B2 caso A: se quitó la frase "No encontré…" y quedó contenido
+        // Contenido anclado a un documento (cita de artículo o "según el Reglamento/
+        // instructivo/procedimiento…") vs. comentario vago sobre el contexto. Lo usan B2 y B3.
+        const ANCLADO = /\b(art[ií]culo|art\.)\s*\d+|seg[uú]n\s+(el|la|los)\s+(reglamento|instructivo|c[oó]digo|documento|procedimiento|rit\b)/i;
+        const VAGO    = /^\s*(sin embargo,?\s*)?(el|este)\s+(contexto|documento)\s+(menciona|habla|trata|aborda)/i;
         // ── B2: Limpieza de frases de faltante ───────────────────────────────────
         // Dos casos posibles cuando llama3.2 emite una frase tipo "No encontré X":
         //   A) FABRICADA: el modelo respondió correctamente Y añadió la frase sobre
@@ -636,13 +640,19 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
             if (frasesEliminadas > 0) {
                 // Paso 3: cobertura de keywords de la pregunta en frase vs resto
                 const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-                const qKw = question.split(/\s+/).map(norm).filter(w => w.length > 3);
+                // Sin signos: "¿puedo" / "planta?" nunca coincidían con el texto (2026-10-09).
+                const qKw = question.split(/\s+/).map(w => norm(w).replace(/[^\p{L}\p{N}]/gu, '')).filter(w => w.length > 3);
 
                 if (qKw.length > 0) {
                     const frasesCov = qKw.filter(k => norm(frasesMatchedText).includes(k)).length / qKw.length;
                     const restoCov  = qKw.filter(k => norm(sinFrases).includes(k)).length / qKw.length;
+                    // El resto puede responder con sinónimos ("¿puedo ingresar alimentos?" →
+                    // "se prohíbe comer… según el Procedimiento de Limpieza"): la cobertura
+                    // de palabras sale baja aunque el contenido esté anclado a un documento.
+                    // En ese caso se trata como caso A y B3 decide si se rescata.
+                    const restoAnclado = sinFrases.length >= 80 && ANCLADO.test(sinFrases) && !VAGO.test(sinFrases);
 
-                    if (frasesCov >= 0.5 && restoCov < 0.30) {
+                    if (frasesCov >= 0.5 && restoCov < 0.30 && !restoAnclado) {
                         // CASO B — frase legítima: el resto no responde la query
                         // No eliminar; escalar a NIF para devolver mensaje estándar
                         clasificacion = 'NO_INFORMATION_FOUND';
@@ -685,8 +695,6 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
         // como PARTIAL_MATCH. Un comentario vago ("el contexto menciona detalles
         // sobre las vacaciones, pero no especifica…") no se rescata.
         if (clasificacion === 'NO_INFORMATION_FOUND' && b2RemovedPhrase) {
-            const ANCLADO = /\b(art[ií]culo|art\.)\s*\d+|seg[uú]n\s+(el|la|los)\s+(reglamento|instructivo|c[oó]digo|documento|procedimiento|rit\b)/i;
-            const VAGO    = /^\s*(sin embargo,?\s*)?(el|este)\s+(contexto|documento)\s+(menciona|habla|trata|aborda)/i;
             if (ANCLADO.test(respuestaFinal) && !VAGO.test(respuestaFinal)) {
                 respuestaFinal = respuestaFinal.replace(/^\s*sin embargo,?\s*(\p{L})/iu, (_, l) => l.toUpperCase());
                 clasificacion = 'PARTIAL_MATCH';
