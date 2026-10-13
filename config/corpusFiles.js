@@ -10,12 +10,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const DOCS_DIR = path.join(__dirname, '..', 'docs');
 
-// Documentos derogados, comunicados obsoletos y meta-archivos técnicos que no
-// son contenido RRHH del corpus de consulta.
+// Documentos derogados y comunicados obsoletos que no son contenido RRHH
+// del corpus de consulta. Los meta-archivos técnicos del proyecto ya no viven
+// en /docs (ver /project-docs), así que no requieren exclusión aquí.
 export const EXCLUDED_FILES = new Set([
-    'OPERATION_MANUAL.md',                    // manual operativo del sistema
-    'PROJECT_CONTEXT.md',                     // meta: contexto técnico del proyecto
-    'TECHNICAL_MANUAL.md',                    // meta: manual técnico del proyecto
     'RIT_PLASTITEC_25_NOV_2025.md',           // RIT derogado (vigente: 01-Jul-2026)
     'COMUNICADO_RIT_PLASTITEC_25_NOV_2025.md', // comunicado del RIT derogado
 ]);

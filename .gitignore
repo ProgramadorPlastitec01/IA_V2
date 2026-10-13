@@ -40,8 +40,22 @@ google-credentials.json
 # NotebookLM MCP specific
 .system_generated/
 server_fixed.log
-node_modules/ 
-.env 
-*.log 
-dist/ 
+node_modules/
+.env
+*.log
+dist/
 /nbproject/private/
+
+# Runtime / state data (regenerable, must stay on disk but not versioned)
+/storage/
+/qdrant/qdrant.exe
+/qdrant/.qdrant-initialized
+/.qdrant-initialized
+/snapshots/
+hr_cache.db
+hr_cache.db-shm
+hr_cache.db-wal
+hr_cache_export.sql
+/analytics.jsonl
+/errors.jsonl
+/logs/*.jsonl
