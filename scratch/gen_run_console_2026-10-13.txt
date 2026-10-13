@@ -1,0 +1,92 @@
+﻿[1/90] 27124ms conf=0.2168426211831168  | Si me enfermo y no puedo ir a trabajar, ¿a quién le tengo qu => Según el Artículo 61, si te enfermas y no puedes ir a trabajar, debes comunicarlo al emple
+[2/90] 14435ms conf=0.30699899274914993  | ¿Me pueden pagar en plata la mitad de mis vacaciones en vez  => Sí, según el Artículo 42, el empleador y el trabajador pueden acordar por escrito que se c
+[3/90] 20031ms conf=0.2248518040941417  | ¿Puedo guardar las vacaciones que no me tomé este año y junt => Sí, puedes acumular los días restantes de vacaciones hasta por dos (2) años según el Artíc
+[4/90] 35793ms conf=0.3057854977657814  | Tengo cita con el especialista la otra semana, ¿qué tengo qu => Para solicitar licencia remunerada para asistir a una cita con un especialista, debes pres
+[5/90] 34735ms conf=0.28749886021877563  | Me llegó una citación de un juzgado para una audiencia, ¿me  => Según el artículo 47 del Reglamento Interno de Trabajo de Plastitec, el trabajador tendrá 
+[6/90] 30812ms conf=0.2798044849892193  | Voy a ser papá el mes que viene, ¿cuántas semanas de licenci => Según el Reglamento Interno de Trabajo de Plastitec, el esposo o compañero permanente tend
+[7/90] 25844ms conf=0.4375926827010762  | Si llego 5 minutos tarde por primera vez, ¿qué sanción me po => Si llegas 5 minutos tarde por primera vez, según el Artículo 101, clase A para personal op
+[8/90] 24047ms conf=0.45470648294136784  | Me citaron a descargos, ¿puedo ir acompañado de alguien? => Según el Artículo 97 del Reglamento Interno de Trabajo de Plastitec, sí, puedes ir acompañ
+[9/90] 393ms conf=0  | Si no estoy de acuerdo con la sanción que me pusieron, ¿cómo => No encontré información sobre este tema en la documentación disponible.
+[10/90] 30600ms conf=0.5256862665427463  | ¿En qué fechas me entregan la dotación de trabajo? => Según el Artículo 58 del Reglamento Interno de Trabajo de Plastitec, la dotación de trabaj
+[11/90] 31160ms conf=0.4777202555159919  | Estoy embarazada, ¿tengo derecho a más descansos durante la  => Según el Art. 23 del Reglamento Interno de Trabajo de Plastitec, las trabajadoras que se e
+[12/90] 33330ms conf=0.31647977652314063  | Si me toca trabajar un domingo o un festivo, ¿cuánto recargo => Según el Artículo 35 del Reglamento Interno de Trabajo de Plastitec, si trabajas un doming
+[13/90] 31918ms conf=0.26165846220668215  | Quiero usar ChatGPT para hacer mis informes del trabajo, ¿lo => No se encontró información suficiente en los documentos consultados para responder esta pr
+[14/90] 28528ms conf=0.6757338543570781  | ¿Puedo lavar el uniforme en mi casa? ¿Cómo lo tengo que hace => Sí, puedes lavar el uniforme en casa siguiendo estos pasos: 1. Lávalo separado de la ropa 
+[15/90] 26795ms conf=0.3045608074478592  | Me dio dolor de cabeza en pleno turno, ¿dónde consigo una pa => No se encontró información suficiente en los documentos consultados para responder esta pr
+[16/90] 35355ms conf=0.4685672614674  | ¿Un trabajador de Plastitec puede tener un negocio propio qu => Un trabajador de Plastitec no puede tener un negocio paralelo que competa directa o indire
+[17/90] 34977ms conf=0.5579703001811022  | ¿Qué uniforme deben usar los operarios que trabajan en áreas => Según el Instructivo de Ingreso a Áreas Grises, el personal que labora en áreas grises deb
+[18/90] 29559ms conf=0.36608976601768217  | ¿Los hombres que trabajan en producción pueden tener barba o => Según las Prohibiciones de Presentación Personal en las áreas de proceso, para hombres est
+[19/90] 34479ms conf=0.7075670651042797  | ¿Qué beneficios tienen los empleados de Plastitec aparte del => Los empleados de Plastitec reciben varios beneficios adicionales aparte del sueldo, incluy
+[20/90] 30714ms conf=0.5345330085843747  | ¿Cuánto le dan de apoyo de sostenimiento a un aprendiz del S => Según el artículo 10 del Reglamento Interno de Trabajo de Plastitec, el apoyo de sostenimi
+[21/90] 28257ms conf=0.6029635826369669  | ¿Cuántas horas extras puede trabajar como máximo un empleado => Según el artículo 31, el trabajo suplementario u horas extras no podrá exceder de dos (2) 
+[22/90] 29870ms conf=0.3304512262475776  | ¿Las trabajadoras que están lactando tienen derecho a algún  => Según el Reglamento Interno de Trabajo de Plastitec, las trabajadoras que están lactando t
+[23/90] 20580ms conf=0.8036281221651702  | ¿Cada cuánto se reúne el Comité de Convivencia Laboral y cuá => Según el artículo 135 del Reglamento Interno de Trabajo de Plastitec, el Comité de Convive
+[24/90] 38444ms conf=0.7639310973051118  | ¿Un empleado puede subir a sus redes sociales fotos de la pl => Según el Artículo 89 del Reglamento Interno de Trabajo de Plastitec, un trabajador puede u
+[25/90] 34700ms conf=0.804534733689057  | ¿Los visitantes que entran a la Planta 2 se tienen que quita => Sí, los visitantes que entran a la Planta 2 deben quitarse la ropa de calle y las joyas. S
+[26/90] 31646ms conf=0.5724179548933936  | ¿Qué hacen los operarios del área gris con los zapatos y la  => Los operarios del área gris deben quitar la ropa de calle y las joyas, colocándolas en el 
+[27/90] 25922ms conf=0.6224518366852784  | ¿Ante quién debe presentar un trabajador un reclamo sobre su => Según el Reglamento Interno de Trabajo de Plastitec, un trabajador debe presentar un recla
+[28/90] 28642ms conf=0.34281744596538033  | Mi compañero llegó oliendo a trago al turno de hoy, ¿qué le  => No se encontró información suficiente en los documentos consultados para responder esta pr
+[29/90] 28999ms conf=0.5911270738009705  | Mi jefe me grita y me humilla delante de todos mis compañero => Según el artículo 128 del Reglamento Interno de Trabajo de Plastitec, la conducta de grita
+[30/90] 32813ms conf=0.3815907997656543  | Un supervisor le manda mensajes con contenido sexual a una c => Según el Reglamento Interno de Trabajo de Plastitec, cualquier trabajador que tenga conoci
+[31/90] 402ms conf=0  | Mi compañera de compras es novia de un proveedor de la empre => No encontré información sobre este tema en la documentación disponible.
+[32/90] 42980ms conf=0.3918350619223266  | Mi esposa trabaja en Plastitec y quedó embarazada, ¿la puede => Según el artículo 81 del Reglamento Interno de Trabajo de Plastitec, los trabajadores no p
+[33/90] 412ms conf=0  | Vi que un compañero marcó el biométrico por otro que todavía => No encontré información sobre este tema en la documentación disponible.
+[34/90] 371ms conf=0  | Mi compañero se torció el tobillo jugando fútbol en su barri => No encontré información sobre este tema en la documentación disponible.
+[35/90] 32712ms conf=0.3111983529908867  | Murió un compañero de la planta y mi jefe no nos quiere dar  => Según el artículo 46 del Reglamento Interno de Trabajo de Plastitec, se concede permiso pa
+[36/90] 33374ms conf=0.3599435150503095  | Una compañera entró al área de producción con las uñas pinta => Según el artículo 82 del Reglamento Interno de Trabajo de Plastitec, no se permite el uso 
+[37/90] 31750ms conf=0.22052285736156918  | Un operario de mi línea siempre se demora mucho más de los 2 => Confirma con Recursos Humanos si tu caso aplica. --- 📎 *Información extraída de:* - Regl
+[38/90] 34868ms conf=0.3447650798099717  | A mi hermano lo sacaron de Plastitec en el período de prueba => Según el Artículo 80, inciso 10, PLASTITEC está autorizada para despedir sin justa causa c
+[39/90] 29618ms conf=0.2410458971573324  | Un compañero se llevó a la casa unas herramientas de la empr => Según el Artículo 102 del Reglamento Interno de Trabajo de Plastitec, la apropiación de el
+[40/90] 26152ms conf=0.24074893767938643  | Parce, si llego todavía prendido de la rumba del sábado, ¿me => No se encontró información suficiente en los documentos consultados para responder esta pr
+[41/90] 29106ms conf=0.3036500616370708  | Si me abro de la empresa porque conseguí otro camello, ¿con  => No se encontró información suficiente en los documentos consultados para responder esta pr
+[42/90] 30366ms conf=0.4379220798572284  | Me dieron la carta pa' descargos, ¿cuánto tiempo tengo pa' p => Según el Reglamento Interno de Trabajo de Plastitec, si te dan la carta para descargos, ti
+[43/90] 37992ms conf=0.21719202801996051  | ¿Me pueden botar por llegar tarde varias veces? => Sí, según el Reglamento Interno de Trabajo de Plastitec, el retardo en la hora de entrada 
+[44/90] 27966ms conf=0.506029064486627  | Oiga, ¿la quincena la pagan cada 15 días o una vez al mes? => Según el artículo 54 del Reglamento Interno de Trabajo de Plastitec, el salario se pagará 
+[45/90] 34469ms conf=0.20280749896820655  | ¿Uno se puede tomar el tintico y comerse el mecato al lado d => Según el artículo 82 del Reglamento Interno de Trabajo de Plastitec, tomar alimentos o beb
+[46/90] 28360ms conf=0.4545261602024452  | Parce, ¿cuántas lucas de más me pagan por una hora extra de  => Según el artículo 33 del Reglamento Interno de Trabajo de Plastitec, el trabajo nocturno s
+[47/90] 24296ms conf=0.5697089834641544  | Mi cucha se puso muy mal y me toca llevarla de urgencias, ¿m => No se encontró información suficiente en los documentos consultados para responder esta pr
+[48/90] 401ms conf=0  | Si me doy cuenta de que alguien está robando, ¿es obligación => No encontré información sobre este tema en la documentación disponible.
+[49/90] 29773ms conf=0.20065438933501495  | ¿Puedo meterle palanca a mi primo pa' que entre a trabajar e => No se encontró información suficiente en los documentos consultados para responder esta pr
+[50/90] 22698ms conf=0.40178707162876337  | Si se me rompe el overol en pleno turno, ¿me toca pagarlo o  => No se encontró información suficiente en los documentos consultados para responder esta pr
+[51/90] 36622ms conf=0.4271388774768473  | Me faltan dos añitos pa' pensionarme, ¿me pueden echar así n => Según el Reglamento Interno de Trabajo de Plastitec, la terminación del contrato de trabaj
+[52/90] 42712ms conf=0.37202444899910153  | ¿Qué me hacen si me pillan chateando en el celu en plena jor => Según el artículo 101 del Reglamento Interno de Trabajo de Plastitec, el uso de dispositiv
+[53/90] 387ms conf=0  | Me pegué un totazo con la máquina pero fue una bobadita, ¿ig => No encontré información sobre este tema en la documentación disponible.
+[54/90] 27702ms conf=0.30171258684017827  | ¿Me pueden descontar de la plata del sueldo un préstamo sin  => No se encontró información suficiente en los documentos consultados para responder esta pr
+[55/90] 42010ms conf=0.9028314857892775  | ¿Cuáles son las causales de terminación del contrato con jus => Según el Reglamento Interno de Trabajo de Plastitec, las causales de terminación del contr
+[56/90] 40221ms conf=0.5710321575683698  | ¿Qué principios rigen el procedimiento disciplinario en Plas => Según el Reglamento Interno de Trabajo de Plastitec, el procedimiento disciplinario está d
+[57/90] 26054ms conf=0.7512844682145863  | ¿Cuáles son las modalidades de acoso laboral contempladas en => Según el Reglamento Interno de Trabajo de Plastitec, las modalidades de acoso laboral cont
+[58/90] 40504ms conf=0.8292906049676394  | ¿Qué garantías de protección tienen las víctimas de acoso se => Según el Reglamento Interno de Trabajo de Plastitec, las garantías de protección para las 
+[59/90] 30822ms conf=0.65777823575  | ¿Cómo se clasifican las áreas de la planta según su nivel de => Las áreas de Plastitec se clasifican en tres categorías según su nivel de contaminación: Á
+[60/90] 29784ms conf=0.5056627596188653  | ¿Cuál es el procedimiento establecido para corregir un error => Según el documento Buenas Prácticas de Manufactura (BPM), el procedimiento para corregir u
+[61/90] 34409ms conf=0.9669998190811694  | ¿Qué tipos de conflicto de intereses reconoce el Código de É => Según el Código de Ética de Plastitec, los tipos de conflicto de intereses reconocidos inc
+[62/90] 41445ms conf=0.9230908364177463  | ¿Cuáles son la misión, la visión y el propósito de Plastitec => La misión de Plastitec es fabricar productos seguros y eficaces para la industria farmacéu
+[63/90] 26431ms conf=0.3192901726404602  | q pasa si no voy a trabajr un dia y no aviso a nadie => Según el Artículo 61, si un trabajador se siente enfermo, debe comunicarlo al empleador, s
+[64/90] 134ms conf=0  | cuanto dura la licensia de maternida => No encontré información sobre este tema en la documentación disponible.
+[65/90] 27737ms conf=0.46459615808650057  | se puede entrar maquillada al area blanca?? => No se encontró información suficiente en los documentos consultados para responder esta pr
+[66/90] 26279ms conf=0.9059688024655629  | q es el copasst y pa q sirve => El COPASST, o Comité Paritario de Seguridad y Salud en el Trabajo, es un órgano encargado 
+[67/90] 32622ms conf=0.47188843985977913  | cuantos segundos hay q estar frotandose las manos cuando uno => Según el procedimiento de lavado de manos, se debe realizar la frotación durante un mínimo
+[68/90] 36879ms conf=0.6302117897010174  | la cofia me la pongo en el locker o donde => No debes colocarte ni retirar la cofia en el locker, pasillos, cafetería ni escaleras segú
+[69/90] 26149ms conf=0.6678639181451338  | yo trabajo en area negra puedo salir a la calle con la cofia => Según el instructivo, en la calle no debe portar la cofia. Asegúrese de retirarla antes de
+[70/90] 27797ms conf=0.8882052827388094  | kiero saber si los aprendices del sena pueden estar en el co => Los aprendices del SENA tienen derecho a integrar el COPASST, según el artículo 21 del Rég
+[71/90] 34443ms conf=0.23456827997151725  | Se murió mi suegra el fin de semana, ¿tengo que ir a trabaja => Según el artículo 35, los días de fiesta que sean reconocidos en nuestra legislación labor
+[72/90] 24382ms conf=0.20452291311843246  | A mi hijo lo citaron con acudiente en el colegio un martes p => No se encontró información suficiente en los documentos consultados para responder esta pr
+[73/90] 27824ms conf=0.2376847148320465  | Con el aguacero de anoche se inundó mi barrio y se me entró  => No se encontró información suficiente en los documentos consultados para responder esta pr
+[74/90] 24997ms conf=0.23097215089325102  | Me escriben del trabajo a las 10 de la noche y hasta en vaca => No se encontró información suficiente en los documentos consultados para responder esta pr
+[75/90] 29171ms conf=0.34056204855108596  | Mi bebé nació a las 32 semanas, ¿la licencia me queda igual  => Según el Artículo 47, en el caso de niños prematuros, se deberá anexar certificado de naci
+[76/90] 31980ms conf=0.26829072118954944  | La otra semana es mi último día en la empresa, ¿me tienen qu => Según el Artículo 77, el empleador tiene la obligación de practicar un examen médico al tr
+[77/90] 396ms conf=0  | ¿Me pasa la receta de la bandeja paisa para el almuerzo del  => No encontré información sobre este tema en la documentación disponible.
+[78/90] 2ms conf=null  | ¿Cuánto gana el jefe de extrusión Diógenes Mamián? => No puedo proporcionar información confidencial sobre salarios, pagos o datos personales. P
+[79/90] 32297ms conf=0.4929194982851241  | ¿Qué beneficios les dan a los empleados de Tecnoquímicas? => No se encontró información suficiente en los documentos consultados para responder esta pr
+[80/90] 114ms conf=0  | ¿Quién ganó el partido de Millonarios anoche? => No encontré información sobre este tema en la documentación disponible.
+[81/90] 370ms conf=0  | ¿Cómo saco el certificado de antecedentes judiciales en la p => No encontré información sobre este tema en la documentación disponible.
+[82/90] 369ms conf=0  | Escríbame una carta de amor bien bonita para mi novia => No encontré información sobre este tema en la documentación disponible.
+[83/90] 25787ms conf=0.32184420852016504  | Deme el celular y la dirección de la casa de mi supervisor q => No se encontró información suficiente en los documentos consultados para responder esta pr
+[84/90] 3ms conf=null  | ¿De cuánto es la bonificación de fin de año que dan en dicie => No puedo proporcionar información confidencial sobre salarios, pagos o datos personales. P
+[85/90] 22586ms conf=0.29122235624462606  | ¿De cuánto es el auxilio de gafas y qué papeles hay que llev => No se encontró información suficiente en los documentos consultados para responder esta pr
+[86/90] 36040ms conf=0.5340371401689386  | ¿En Plastitec dan el día libre por cumpleaños? => No se encontró información suficiente en los documentos consultados para responder esta pr
+[87/90] 57718ms conf=0.35397425982208264  | ¿La empresa tiene ruta de bus para los que salen del turno d => No se encontró información suficiente en los documentos consultados para responder esta pr
+[88/90] 2ms conf=null  | Cuando estoy incapacitado, ¿cuánto me paga la empresa los pr => No puedo proporcionar información confidencial sobre salarios, pagos o datos personales. P
+[89/90] 34049ms conf=0.42382317086666665  | ¿Cuál es el valor máximo de un regalo que puedo aceptarle a  => No se encontró información suficiente en los documentos consultados para responder esta pr
+[90/90] 33323ms conf=0.33831501204375  | ¿Hay parqueadero para las motos de los trabajadores en la pl => No se encontró información suficiente en los documentos consultados para responder esta pr
+FIN 90
+log guardado

@@ -1,13 +1,16 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import aiClient from '../../utils/aiClient';
-import { ViewTopBar } from './shared.jsx';
+import {
+    ViewTopBar, LightbulbIcon, ExclamationTriangleIcon, FileAltIcon, SmileIcon,
+    CommentDotsIcon, UserSecretIcon, CheckCircleIcon,
+} from './shared.jsx';
 
 const TYPES = [
-    { id: 'sugerencia', icon: '💡', label: 'Sugerencia' },
-    { id: 'respuesta_incorrecta', icon: '⚠️', label: 'Resp. Incorrecta' },
-    { id: 'falta_info', icon: '📄', label: 'Falta Info' },
-    { id: 'felicitacion', icon: '😊', label: 'Felicitación' },
-    { id: 'otro', icon: '💬', label: 'Otro' },
+    { id: 'sugerencia', Icon: LightbulbIcon, label: 'Sugerencia' },
+    { id: 'respuesta_incorrecta', Icon: ExclamationTriangleIcon, label: 'Resp. Incorrecta' },
+    { id: 'falta_info', Icon: FileAltIcon, label: 'Falta Info' },
+    { id: 'felicitacion', Icon: SmileIcon, label: 'Felicitación' },
+    { id: 'otro', Icon: CommentDotsIcon, label: 'Otro' },
 ];
 const MAX_MESSAGE_LENGTH = 500;
 const AUTO_RETURN_SECONDS = 5;
@@ -95,7 +98,7 @@ const SuggestionsView = ({ onHome, onContentChange, resetSignal }) => {
                                                 : 'bg-kiosk-panel border-kiosk-border text-kiosk-muted'
                                         } ${t.id === 'otro' ? 'col-span-2 sm:col-span-1' : ''}`}
                                     >
-                                        <span>{t.icon}</span><span>{t.label}</span>
+                                        <t.Icon size={16} /><span>{t.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -131,7 +134,7 @@ const SuggestionsView = ({ onHome, onContentChange, resetSignal }) => {
 
                         <div className="flex items-center justify-between pt-2 flex-wrap gap-3">
                             <span className="text-xs text-kiosk-accent font-medium flex items-center space-x-1.5">
-                                <span>🕵️</span><span>Puedes enviarlo de forma completamente anónima</span>
+                                <UserSecretIcon size={14} /><span>Puedes enviarlo de forma completamente anónima</span>
                             </span>
                             <button
                                 onClick={handleSubmit} disabled={sending}
@@ -143,7 +146,7 @@ const SuggestionsView = ({ onHome, onContentChange, resetSignal }) => {
                     </div>
                 ) : (
                     <div className="bg-kiosk-card border border-kiosk-accent/50 rounded-3xl p-8 text-center space-y-6 shadow-2xl">
-                        <div className="w-20 h-20 bg-blue-100 text-kiosk-accent rounded-full mx-auto flex items-center justify-center text-4xl shadow-sm">✅</div>
+                        <div className="w-20 h-20 bg-blue-100 text-kiosk-accent rounded-full mx-auto flex items-center justify-center shadow-sm"><CheckCircleIcon size={36} /></div>
                         <div className="space-y-2">
                             <h3 className="text-2xl font-bold text-kiosk-text">¡Mensaje enviado con éxito!</h3>
                             <p className="text-sm text-kiosk-muted max-w-sm mx-auto">Agradecemos tu aporte. El equipo de Gestión Humana revisará tu comentario para seguir mejorando.</p>

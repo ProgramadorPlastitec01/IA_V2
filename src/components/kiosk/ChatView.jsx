@@ -8,6 +8,8 @@ import {
     splitAnswer, isNotFoundAnswer, AnswerBody,
     MicIcon, StopIcon, SendIcon, SpeakerIcon, CopyIcon,
     ViewTopBar, copyToClipboard, CAT, ICONS,
+    CheckCircleIcon, ExclamationTriangleIcon, BanIcon, TimesIcon, PaperclipIcon,
+    CheckIcon, FrownIcon, MehIcon, SmileIcon, RedoAltIcon,
 } from './shared.jsx';
 
 /**
@@ -331,7 +333,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                 const isNonLocalhost = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
                 reportError('Mic', 'activateApp', 'mediaDevices not available', null, { protocol: window.location.protocol, hostname: window.location.hostname });
                 setToastError(isHTTP && isNonLocalhost
-                    ? '⚠️ Micrófono requiere HTTPS. Usando modo teclado.'
+                    ? 'Micrófono requiere HTTPS. Usando modo teclado.'
                     : 'Micrófono no disponible en este navegador. Usando modo teclado.');
                 return;
             }
@@ -374,7 +376,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
     return (
         <section className="flex-1 flex flex-col h-full overflow-hidden bg-kiosk-bg">
             <ViewTopBar
-                title="Asistente IA Plastitec"
+                title="RITA"
                 onHome={onHome}
                 action={<span className="text-xs text-kiosk-muted hidden sm:inline w-24 text-right">Una respuesta a la vez</span>}
             />
@@ -469,14 +471,16 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                         <div ref={answerRef} className="w-full space-y-6">
                             <div className="bg-kiosk-panel border border-kiosk-border px-4 py-2.5 rounded-xl text-xs text-kiosk-muted flex items-center justify-between shadow-sm">
                                 <span><strong className="text-kiosk-text">Tu pregunta:</strong> {answer.question}</span>
-                                <button onClick={resetChat} className="text-kiosk-accent hover:underline font-semibold whitespace-nowrap ml-3">↺ Nueva pregunta</button>
+                                <button onClick={resetChat} className="text-kiosk-accent hover:underline font-semibold whitespace-nowrap ml-3 inline-flex items-center gap-1">
+                                    <RedoAltIcon size={11} /><span>Nueva pregunta</span>
+                                </button>
                             </div>
 
                             {!answer.notFound ? (
                                 <>
                                     <div className="bg-kiosk-card border border-kiosk-accent/40 rounded-2xl p-6 shadow-xl space-y-4">
                                         <div className="flex items-center space-x-3 text-kiosk-accent">
-                                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.5 14.5-4-4 1.4-1.4 2.6 2.6 6.6-6.6 1.4 1.4z" /></svg>
+                                            <CheckCircleIcon size={22} />
                                             <h4 className="font-bold text-lg text-kiosk-text">Respuesta Encontrada</h4>
                                         </div>
                                         <div className="bg-kiosk-panel p-4 rounded-xl border border-kiosk-border shadow-inner">
@@ -485,7 +489,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                                         <div className="flex items-center justify-between text-xs text-kiosk-muted pt-2 border-t border-kiosk-border flex-wrap gap-2">
                                             {answer.sources.length > 0 ? (
                                                 <span className="flex items-start gap-1.5">
-                                                    <span className="text-kiosk-accent mt-0.5">📎</span>
+                                                    <span className="text-kiosk-accent mt-0.5"><PaperclipIcon size={13} /></span>
                                                     <span><strong>Fuente:</strong> {answer.sources.join(' · ')}</span>
                                                 </span>
                                             ) : <span />}
@@ -496,7 +500,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                                                     </button>
                                                 )}
                                                 <button onClick={handleCopy} className="bg-kiosk-panel hover:bg-blue-50 text-kiosk-text hover:text-kiosk-accent px-3 py-1.5 rounded-lg border border-kiosk-border transition-colors flex items-center space-x-1 shadow-sm">
-                                                    <CopyIcon /><span>{copied ? 'Copiada ✓' : 'Copiar'}</span>
+                                                    {copied ? <CheckIcon size={13} /> : <CopyIcon />}<span>{copied ? 'Copiada' : 'Copiar'}</span>
                                                 </button>
                                             </div>
                                         </div>
@@ -508,14 +512,14 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                                             <>
                                                 <p className="text-sm font-semibold text-kiosk-text">¿Te sirvió esta respuesta?</p>
                                                 <div className="flex justify-center gap-3">
-                                                    <button onClick={() => sendFeedback('bad')} className="bg-kiosk-panel hover:bg-rose-50 border border-kiosk-border hover:border-rose-300 px-5 py-2.5 rounded-xl text-xl transition-all flex items-center space-x-2 shadow-sm">
-                                                        <span>😞</span><span className="text-xs text-kiosk-muted font-medium">No sirvió</span>
+                                                    <button onClick={() => sendFeedback('bad')} className="bg-kiosk-panel hover:bg-rose-50 border border-kiosk-border hover:border-rose-300 px-5 py-2.5 rounded-xl text-rose-500 transition-all flex items-center space-x-2 shadow-sm">
+                                                        <FrownIcon size={20} /><span className="text-xs text-kiosk-muted font-medium">No sirvió</span>
                                                     </button>
-                                                    <button onClick={() => sendFeedback('neutral')} className="bg-kiosk-panel hover:bg-amber-50 border border-kiosk-border hover:border-amber-300 px-5 py-2.5 rounded-xl text-xl transition-all flex items-center space-x-2 shadow-sm">
-                                                        <span>😐</span><span className="text-xs text-kiosk-muted font-medium">Más o menos</span>
+                                                    <button onClick={() => sendFeedback('neutral')} className="bg-kiosk-panel hover:bg-amber-50 border border-kiosk-border hover:border-amber-300 px-5 py-2.5 rounded-xl text-amber-500 transition-all flex items-center space-x-2 shadow-sm">
+                                                        <MehIcon size={20} /><span className="text-xs text-kiosk-muted font-medium">Más o menos</span>
                                                     </button>
-                                                    <button onClick={() => sendFeedback('good')} className="bg-kiosk-panel hover:bg-emerald-50 border border-kiosk-border hover:border-emerald-300 px-5 py-2.5 rounded-xl text-xl transition-all flex items-center space-x-2 shadow-sm">
-                                                        <span>😊</span><span className="text-xs text-kiosk-muted font-medium">Me sirvió</span>
+                                                    <button onClick={() => sendFeedback('good')} className="bg-kiosk-panel hover:bg-emerald-50 border border-kiosk-border hover:border-emerald-300 px-5 py-2.5 rounded-xl text-emerald-500 transition-all flex items-center space-x-2 shadow-sm">
+                                                        <SmileIcon size={20} /><span className="text-xs text-kiosk-muted font-medium">Me sirvió</span>
                                                     </button>
                                                 </div>
                                             </>
@@ -530,7 +534,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                                 </>
                             ) : (
                                 <div className="w-full space-y-6 text-center">
-                                    <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-3xl mx-auto flex items-center justify-center text-3xl shadow-sm">⚠️</div>
+                                    <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-3xl mx-auto flex items-center justify-center shadow-sm"><ExclamationTriangleIcon size={28} /></div>
                                     <div className="space-y-2">
                                         <h3 className="text-xl font-bold text-kiosk-text">Información no encontrada</h3>
                                         <p className="text-sm text-kiosk-muted max-w-md mx-auto">No encontré esta información específica en los documentos oficiales actuales de Plastitec.</p>
@@ -554,7 +558,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                     {/* ── Estado: error de sistema (falló la consulta al backend) ── */}
                     {systemError && !isBusy && !answer && (
                         <div className="w-full space-y-6 text-center">
-                            <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-3xl mx-auto flex items-center justify-center text-3xl shadow-sm">⛔</div>
+                            <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-3xl mx-auto flex items-center justify-center shadow-sm"><BanIcon size={28} /></div>
                             <div className="space-y-2">
                                 <h3 className="text-xl font-bold text-kiosk-text">Error temporal del sistema</h3>
                                 <p className="text-sm text-kiosk-muted max-w-md mx-auto">{systemError}</p>
@@ -575,9 +579,9 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                 {toastError && (
                     <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-16 left-0 w-full flex justify-center z-[100] px-6">
                         <div className="bg-kiosk-card border border-rose-200 text-kiosk-text px-6 py-3 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] flex items-center gap-3 max-w-lg">
-                            <span className="text-lg">⚠️</span>
+                            <span className="text-amber-500"><ExclamationTriangleIcon size={18} /></span>
                             <span className="text-sm font-medium flex-1 text-rose-700">{toastError}</span>
-                            <button onClick={() => setToastError(null)} className="text-kiosk-muted hover:text-kiosk-text transition-colors px-2">✕</button>
+                            <button onClick={() => setToastError(null)} className="text-kiosk-muted hover:text-kiosk-text transition-colors px-2"><TimesIcon size={14} /></button>
                         </div>
                     </motion.div>
                 )}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../utils/apiConfig';
-import { ViewTopBar } from './shared.jsx';
+import { ViewTopBar, HandsHelpingIcon, SearchIcon, FileAltIcon, CheckIcon } from './shared.jsx';
 
 /**
  * DocumentsView — "Documentos Disponibles" (rediseño 2026-10-09).
@@ -49,7 +49,7 @@ const DocumentsView = ({ onHome, onNavigate }) => {
                 onHome={onHome}
                 action={
                     <button onClick={() => onNavigate('chat')} className="bg-blue-50 hover:bg-blue-100 text-kiosk-accent px-3 py-1.5 rounded-xl border border-blue-200 text-xs font-semibold flex items-center space-x-1.5 shadow-sm">
-                        <span>✨</span><span>Preguntar a IA</span>
+                        <HandsHelpingIcon size={14} /><span>Preguntar a RITA</span>
                     </button>
                 }
             />
@@ -61,7 +61,7 @@ const DocumentsView = ({ onHome, onNavigate }) => {
                         <p className="text-xs text-kiosk-muted mt-0.5">Estos son los documentos oficiales que el Asistente IA consulta para darte respuestas.</p>
                     </div>
                     <div className="bg-kiosk-card border border-kiosk-border rounded-xl px-3 py-2 flex items-center space-x-2 w-full md:w-80 shadow-sm">
-                        <span className="text-kiosk-muted">🔍</span>
+                        <span className="text-kiosk-muted"><SearchIcon size={14} /></span>
                         <input
                             type="text" value={query} onChange={e => setQuery(e.target.value)}
                             placeholder="Buscar documento..."
@@ -85,14 +85,14 @@ const DocumentsView = ({ onHome, onNavigate }) => {
                                         <span className="bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1 rounded-full border border-blue-100">Documento Oficial</span>
                                     </div>
                                     <h4 className="font-bold text-kiosk-text text-base flex items-start gap-2">
-                                        <span className="text-lg shrink-0">📘</span>
+                                        <span className="text-blue-500 shrink-0 mt-0.5"><FileAltIcon size={18} /></span>
                                         <span>{name}</span>
                                     </h4>
                                 </div>
                                 <div className="mt-4 pt-3 border-t border-kiosk-border flex items-center justify-between text-xs">
                                     <span className="text-kiosk-muted">Consultado por el Asistente IA</span>
                                     <span className="text-kiosk-accent font-semibold flex items-center space-x-1">
-                                        <span>✓</span><span>Indexado por IA</span>
+                                        <CheckIcon size={11} /><span>Indexado por IA</span>
                                     </span>
                                 </div>
                             </div>

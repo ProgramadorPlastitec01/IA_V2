@@ -1,5 +1,5 @@
 ﻿import { motion } from 'framer-motion';
-import { ChevronRightIcon } from './shared.jsx';
+import { ChevronRightIcon, HandsHelpingIcon, FileAltIcon, QuestionIcon, BookOpenIcon, CommentDotsIcon } from './shared.jsx';
 
 /**
  * HomeView — pantalla de inicio del kiosco (rediseño 2026-10-09).
@@ -8,10 +8,10 @@ import { ChevronRightIcon } from './shared.jsx';
  * prototipo de referencia (plastitec_hr_kiosk_prototype.html).
  */
 const MODULES = [
-    { id: 'documents', icon: '📄', color: 'blue', title: 'Documentos Disponibles', desc: 'Reglamentos, códigos y políticas oficiales.' },
-    { id: 'faqs', icon: '❓', color: 'purple', title: 'Preguntas Frecuentes', desc: 'Las dudas más consultadas, agrupadas por tema.' },
-    { id: 'guide', icon: '📘', color: 'amber', title: '¿Cómo usar el asistente?', desc: 'Guía rápida para obtener mejores respuestas.' },
-    { id: 'suggestions', icon: '💬', color: 'rose', title: 'Buzón de Sugerencias', desc: 'Comentarios, reportes y felicitaciones.' },
+    { id: 'documents', Icon: FileAltIcon, color: 'blue', title: 'Documentos Disponibles', desc: 'Reglamentos, códigos y políticas oficiales.' },
+    { id: 'faqs', Icon: QuestionIcon, color: 'purple', title: 'Preguntas Frecuentes', desc: 'Las dudas más consultadas, agrupadas por tema.' },
+    { id: 'guide', Icon: BookOpenIcon, color: 'amber', title: '¿Cómo usar el asistente?', desc: 'Guía rápida para obtener mejores respuestas.' },
+    { id: 'suggestions', Icon: CommentDotsIcon, color: 'rose', title: 'Buzón de Sugerencias', desc: 'Comentarios, reportes y felicitaciones.' },
 ];
 
 const MODULE_COLORS = {
@@ -21,10 +21,10 @@ const MODULE_COLORS = {
     rose: 'bg-rose-100 text-rose-600 group-hover:bg-rose-200',
 };
 
-const HomeView = ({ onNavigate, onLogoClick, systemOnline }) => (
+const HomeView = ({ onNavigate }) => (
     <section className="flex-1 flex flex-col p-6 md:p-8 overflow-y-auto bg-kiosk-bg">
         <div className="text-center max-w-2xl mx-auto mb-6">
-            <h2 className="text-2xl md:text-3xl font-extrabold text-kiosk-text tracking-tight">Bienvenido a tu Kiosco de Autoservicio</h2>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-kiosk-text tracking-tight">Bienvenido</h2>
             <p className="text-sm md:text-base text-kiosk-muted mt-1">Selecciona una opción para comenzar. ¿Cómo podemos ayudarte hoy?</p>
         </div>
 
@@ -39,11 +39,11 @@ const HomeView = ({ onNavigate, onLogoClick, systemOnline }) => (
             >
                 <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-brand/10 rounded-full blur-2xl group-hover:bg-brand/20 transition-all" />
                 <div>
-                    <div className="w-14 h-14 rounded-2xl bg-brand text-white flex items-center justify-center text-2xl shadow-md mb-4 group-hover:scale-110 transition-transform">
-                        ✨
+                    <div className="w-14 h-14 rounded-2xl bg-brand text-white flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform">
+                        <HandsHelpingIcon size={28} />
                     </div>
                     <span className="inline-block bg-brand-light text-brand text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2">Recomendado</span>
-                    <h3 className="text-2xl md:text-3xl font-bold text-kiosk-text group-hover:text-brand transition-colors">Pregúntale a la IA</h3>
+                    <h3 className="text-2xl md:text-3xl font-bold text-kiosk-text group-hover:text-brand transition-colors">Pregúntale a RITA</h3>
                     <p className="text-sm md:text-base text-kiosk-muted mt-2">Resuelve tus dudas al instante sobre políticas, vacaciones, permisos y reglamentos de la empresa.</p>
                 </div>
                 <div className="mt-6 flex items-center justify-between pt-4 border-t border-kiosk-border">
@@ -64,8 +64,8 @@ const HomeView = ({ onNavigate, onLogoClick, systemOnline }) => (
                         onClick={() => onNavigate(m.id)}
                         className="bg-kiosk-panel hover:bg-kiosk-card-hover border border-kiosk-border rounded-2xl p-4 flex items-center space-x-4 cursor-pointer transition-all group shadow-sm"
                     >
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 transition-colors ${MODULE_COLORS[m.color]}`}>
-                            {m.icon}
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${MODULE_COLORS[m.color]}`}>
+                            <m.Icon size={20} />
                         </div>
                         <div className="flex-1">
                             <h4 className="font-bold text-kiosk-text text-sm md:text-base transition-colors">{m.title}</h4>
@@ -75,14 +75,6 @@ const HomeView = ({ onNavigate, onLogoClick, systemOnline }) => (
                     </motion.div>
                 ))}
             </div>
-        </div>
-
-        <div className="mt-6 pt-4 border-t border-kiosk-border flex flex-wrap items-center justify-between gap-2 text-xs text-kiosk-muted">
-            <p onClick={onLogoClick} className="cursor-default select-none">© {new Date().getFullYear()} Plastitec S.A.S. — Todos los derechos reservados.</p>
-            <span className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${systemOnline ? 'bg-kiosk-accent animate-pulse' : 'bg-rose-400'}`} />
-                <span>{systemOnline ? 'Sistema en línea' : 'Verificando conexión…'}</span>
-            </span>
         </div>
     </section>
 );

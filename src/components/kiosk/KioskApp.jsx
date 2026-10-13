@@ -8,6 +8,8 @@ import DocumentsView from './DocumentsView';
 import FaqView from './FaqView';
 import SuggestionsView from './SuggestionsView';
 import GuideView from './GuideView';
+import AboutRitaModal from './AboutRitaModal.jsx';
+import { HandsHelpingIcon, FlaskIcon, SyncAltIcon, HourglassHalfIcon, LockIcon, PenIcon } from './shared.jsx';
 
 // Kiosco compartido: si hay una pregunta/respuesta o un borrador de sugerencia
 // en pantalla y nadie interactúa en 5 minutos, se avisa con cuenta regresiva
@@ -42,6 +44,7 @@ const KioskApp = () => {
     const [showInactivityModal, setShowInactivityModal] = useState(false);
     const [inactivityCountdown, setInactivityCountdown] = useState(INACTIVITY_COUNTDOWN_S);
     const [showPinModal, setShowPinModal] = useState(false);
+    const [isAboutOpen, setIsAboutOpen] = useState(false);
 
     const confirmResetTimerRef = useRef(null);
     const inactivityCountdownTimerRef = useRef(null);
@@ -182,7 +185,7 @@ const KioskApp = () => {
             case 'guide':
                 return <GuideView onHome={() => navigateTo('home')} onNavigate={navigateTo} />;
             default:
-                return <HomeView onNavigate={navigateTo} onLogoClick={handleSecretClick} systemOnline={systemOnline} />;
+                return <HomeView onNavigate={navigateTo} />;
         }
     };
 
@@ -203,7 +206,7 @@ const KioskApp = () => {
                         </div>
                     </div>
                     <span className="hidden md:flex bg-amber-50 text-amber-700 text-xs font-semibold px-3 py-1 rounded-full border border-amber-200 items-center space-x-1.5 shrink-0">
-                        <span>🧪</span><span>Versión de pruebas</span>
+                        <FlaskIcon size={12} /><span>Versión de pruebas</span>
                     </span>
                     {view !== 'home' && (
                         <span className="text-sm font-semibold text-kiosk-muted truncate hidden lg:inline">· {VIEW_TITLES[view]}</span>
@@ -211,6 +214,13 @@ const KioskApp = () => {
                 </div>
 
                 <div className="flex items-center space-x-2 md:space-x-3 shrink-0">
+                    <button
+                        onClick={() => setIsAboutOpen(true)}
+                        title="¿Qué es RITA?"
+                        className="hidden sm:flex items-center space-x-1.5 bg-kiosk-panel hover:bg-kiosk-card-hover px-3 py-1.5 rounded-full border border-kiosk-border text-xs text-brand font-semibold shadow-sm transition-colors"
+                    >
+                        <HandsHelpingIcon size={14} /><span>¿Qué es RITA?</span>
+                    </button>
                     <div className="hidden sm:flex items-center space-x-2 bg-kiosk-panel px-3 py-1.5 rounded-full border border-kiosk-border text-xs text-kiosk-muted shadow-sm">
                         <span className={`w-2.5 h-2.5 rounded-full ${systemOnline ? 'bg-kiosk-accent animate-pulse' : 'bg-rose-400'}`} />
                         <span>{systemOnline ? 'Sistema en Línea' : 'Sin conexión'}</span>
@@ -222,7 +232,7 @@ const KioskApp = () => {
                             confirmingReset ? 'text-white border-transparent bg-rose-500' : 'bg-kiosk-panel border-kiosk-border text-kiosk-text hover:bg-kiosk-card-hover'
                         }`}
                     >
-                        <span>🔄</span><span className="hidden sm:inline">{confirmingReset ? '¿Seguro?' : 'Reiniciar'}</span>
+                        <SyncAltIcon size={14} /><span className="hidden sm:inline">{confirmingReset ? '¿Seguro?' : 'Reiniciar'}</span>
                     </button>
                 </div>
             </header>
@@ -241,7 +251,7 @@ const KioskApp = () => {
                 {showInactivityModal && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                         <motion.div initial={{ scale: 0.95, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 12 }} className="bg-kiosk-card border border-kiosk-border rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl">
-                            <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full mx-auto flex items-center justify-center text-3xl">⏳</div>
+                            <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full mx-auto flex items-center justify-center"><HourglassHalfIcon size={32} /></div>
                             <div className="space-y-2">
                                 <h3 className="text-2xl font-bold text-kiosk-text">¿Sigues ahí?</h3>
                                 <p className="text-sm text-kiosk-muted">Por seguridad y privacidad, el kiosco se reiniciará automáticamente por inactividad.</p>
@@ -267,7 +277,7 @@ const KioskApp = () => {
                         className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm" onClick={() => setShowPinModal(false)}>
                         <motion.div initial={{ scale: 0.95, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 12 }}
                             className="bg-kiosk-card border border-kiosk-border rounded-2xl p-7 max-w-sm w-full shadow-2xl text-center" onClick={e => e.stopPropagation()}>
-                            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-2xl mx-auto mb-4 text-kiosk-accent">🔐</div>
+                            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-4 text-kiosk-accent"><LockIcon size={22} /></div>
                             <h2 className="text-base font-medium text-kiosk-text">Acceso Admin</h2>
                             <p className="text-[13px] text-kiosk-muted mt-1 mb-5">Panel de administración protegido</p>
                             <form onSubmit={async (e) => {
@@ -292,9 +302,14 @@ const KioskApp = () => {
                 )}
             </AnimatePresence>
 
+            {/* ── Modal: ¿Qué es RITA? ───────────────────────────────────── */}
+            <AboutRitaModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+
             {/* ── Footer global: aviso de fase de pruebas ────────────────── */}
             <div className="shrink-0 px-6 py-2 border-t border-kiosk-border text-center bg-amber-50">
-                <p className="text-xs text-amber-800">✏️ Este asistente se encuentra en fase de pruebas. Tu retroalimentación nos ayuda a mejorarlo.</p>
+                <p className="text-xs text-amber-800 flex items-center justify-center gap-1.5">
+                    <PenIcon size={11} /><span>Este asistente se encuentra en fase de pruebas. Tu retroalimentación nos ayuda a mejorarlo.</span>
+                </p>
             </div>
         </div>
     );

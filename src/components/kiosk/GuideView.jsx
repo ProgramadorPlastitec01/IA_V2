@@ -1,4 +1,7 @@
-﻿import { ViewTopBar } from './shared.jsx';
+﻿import {
+    ViewTopBar, KeyboardIcon, BrainIcon, SmileIcon, HandPointUpIcon,
+    CheckCircleIcon, TimesCircleIcon, KeyIcon,
+} from './shared.jsx';
 
 /**
  * GuideView — "¿Cómo usar el asistente?" (rediseño 2026-10-09).
@@ -18,14 +21,14 @@ const GuideView = ({ onHome, onNavigate }) => (
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                    { n: 1, icon: '⌨️', bg: 'bg-blue-50', title: 'Escribe o Dicta', text: 'Selecciona "Pregúntale a la IA" y escribe tu duda con el teclado táctil o presiona el micrófono para dictar por voz.', tip: 'Tip: Usa las sugerencias rápidas.', tipColor: 'text-kiosk-accent' },
-                    { n: 2, icon: '🧠', bg: 'bg-blue-50', title: 'Consulta Instantánea', text: 'El sistema analiza los documentos oficiales y te entrega la respuesta exacta junto con la fuente documental.', tip: 'Verificado con reglamentos vigentes.', tipColor: 'text-blue-600' },
-                    { n: 3, icon: '😊', bg: 'bg-purple-50', title: 'Califica y Listo', text: 'Califica con un solo toque si te sirvió la respuesta. El kiosco se reinicia automáticamente tras cada consulta.', tip: '1 toque para calificar.', tipColor: 'text-purple-600' },
+                    { n: 1, Icon: KeyboardIcon, bg: 'bg-blue-50', iconColor: 'text-blue-600', title: 'Escribe o Dicta', text: 'Selecciona "Pregúntale a la IA" y escribe tu duda con el teclado táctil o presiona el micrófono para dictar por voz.', tip: 'Tip: Usa las sugerencias rápidas.', tipColor: 'text-kiosk-accent' },
+                    { n: 2, Icon: BrainIcon, bg: 'bg-blue-50', iconColor: 'text-blue-600', title: 'Consulta Instantánea', text: 'El sistema analiza los documentos oficiales y te entrega la respuesta exacta junto con la fuente documental.', tip: 'Verificado con reglamentos vigentes.', tipColor: 'text-blue-600' },
+                    { n: 3, Icon: SmileIcon, bg: 'bg-purple-50', iconColor: 'text-purple-600', title: 'Califica y Listo', text: 'Califica con un solo toque si te sirvió la respuesta. El kiosco se reinicia automáticamente tras cada consulta.', tip: '1 toque para calificar.', tipColor: 'text-purple-600' },
                 ].map(step => (
                     <div key={step.n} className="bg-kiosk-card border border-kiosk-border rounded-3xl p-6 relative flex flex-col justify-between shadow-sm">
                         <div className="absolute -top-4 left-6 w-8 h-8 rounded-full bg-kiosk-accent text-white font-black flex items-center justify-center text-sm shadow-md">{step.n}</div>
                         <div className="space-y-4 pt-2">
-                            <div className={`w-14 h-14 rounded-2xl ${step.bg} flex items-center justify-center text-2xl`}>{step.icon}</div>
+                            <div className={`w-14 h-14 rounded-2xl ${step.bg} ${step.iconColor} flex items-center justify-center`}><step.Icon size={24} /></div>
                             <h4 className="font-bold text-kiosk-text text-base">{step.title}</h4>
                             <p className="text-xs text-kiosk-muted leading-relaxed">{step.text}</p>
                         </div>
@@ -37,7 +40,7 @@ const GuideView = ({ onHome, onNavigate }) => (
             {/* Una pregunta a la vez */}
             <section className="rounded-3xl p-6 border bg-amber-50 border-amber-300">
                 <h3 className="text-sm font-medium uppercase tracking-[0.2em] mb-3 flex items-center gap-2 text-amber-700">
-                    <span>☝️</span> Una pregunta a la vez
+                    <HandPointUpIcon size={16} /> Una pregunta a la vez
                 </h3>
                 <p className="text-kiosk-text leading-relaxed">
                     El asistente <strong className="font-semibold">no es un chat</strong>: no recuerda tu pregunta anterior.
@@ -53,7 +56,7 @@ const GuideView = ({ onHome, onNavigate }) => (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <section className="rounded-3xl p-6 border bg-emerald-50 border-emerald-300">
                     <h3 className="text-base font-medium flex items-center gap-2 mb-4 text-emerald-700">
-                        <span className="text-xl">✅</span> Ejemplos Correctos
+                        <CheckCircleIcon size={20} /> Ejemplos Correctos
                     </h3>
                     <ul className="space-y-4">
                         {[
@@ -71,7 +74,7 @@ const GuideView = ({ onHome, onNavigate }) => (
 
                 <section className="rounded-3xl p-6 border bg-rose-50 border-rose-300">
                     <h3 className="text-base font-medium flex items-center gap-2 mb-4 text-rose-700">
-                        <span className="text-xl">❌</span> Ejemplos Incorrectos
+                        <TimesCircleIcon size={20} /> Ejemplos Incorrectos
                     </h3>
                     <ul className="space-y-4">
                         {['"vacaciones"', '"horario"', '"tarde"'].map((t, i) => (
@@ -87,7 +90,7 @@ const GuideView = ({ onHome, onNavigate }) => (
 
             <section className="bg-kiosk-panel border border-kiosk-border rounded-3xl p-6">
                 <h3 className="text-sm font-medium uppercase tracking-[0.2em] mb-4 flex items-center gap-2 text-purple-700">
-                    <span>🔑</span> Recomendación de Palabras Clave
+                    <KeyIcon size={14} /> Recomendación de Palabras Clave
                 </h3>
                 <p className="text-kiosk-muted text-sm mb-4">
                     Usar los términos correctos del Reglamento Interno ayuda a localizar la información rápidamente:
