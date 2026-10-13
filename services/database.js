@@ -130,6 +130,23 @@ class DatabaseService {
             `);
             await this.db.exec(`CREATE INDEX IF NOT EXISTS idx_ratings_created ON answer_ratings(created_at)`);
 
+            // ── Validación de Modelos IA — banco de pruebas (Admin Dashboard 2026-10) ──
+            await this.db.exec(`
+                CREATE TABLE IF NOT EXISTS model_benchmarks (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    production_model    TEXT    NOT NULL,
+                    candidate_model     TEXT    NOT NULL,
+                    include_reranker    INTEGER DEFAULT 0,
+                    dataset_version     TEXT    NOT NULL,
+                    dataset_size        INTEGER NOT NULL,
+                    summary             TEXT    NOT NULL,
+                    details             TEXT    NOT NULL,
+                    promoted            INTEGER DEFAULT 0,
+                    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            await this.db.exec(`CREATE INDEX IF NOT EXISTS idx_benchmarks_created ON model_benchmarks(created_at)`);
+
             console.log(`✅ SQLite Cache Database inicializada en: ${DB_PATH}`);
         } catch (error) {
             console.error('❌ Error inicializando SQLite:', error.message);
@@ -526,6 +543,50 @@ class DatabaseService {
             totals,
             recent: recent.map(r => ({ ...r, sources: (() => { try { return JSON.parse(r.sources || '[]'); } catch { return []; } })() }))
         };
+    }
+
+    // ── Validación de Modelos IA (banco de pruebas) ─────────────────────
+
+    /**
+     * @param {{productionModel:string, candidateModel:string, includeReranker:boolean,
+     *           datasetVersion:string, datasetSize:number, summary:object, details:object[]}} run
+     * @returns {Promise<number>} id de la corrida insertada
+     */
+    async saveBenchmarkRun({ productionModel, candidateModel, includeReranker, datasetVersion, datasetSize, summary, details }) {
+        if (!this.db) throw new Error('DB no inicializada');
+        const result = await this.db.run(
+            `INSERT INTO model_benchmarks
+                (production_model, candidate_model, include_reranker, dataset_version, dataset_size, summary, details)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [productionModel, candidateModel, includeReranker ? 1 : 0, datasetVersion, datasetSize, JSON.stringify(summary), JSON.stringify(details)]
+        );
+        return result.lastID;
+    }
+
+    async listBenchmarkRuns(limit = 20) {
+        if (!this.db) return [];
+        const rows = await this.db.all(
+            `SELECT id, production_model, candidate_model, include_reranker, dataset_version, dataset_size, summary, promoted, created_at
+             FROM model_benchmarks ORDER BY id DESC LIMIT ?`,
+            [limit]
+        );
+        return rows.map(r => ({ ...r, summary: (() => { try { return JSON.parse(r.summary); } catch { return null; } })() }));
+    }
+
+    async getBenchmarkRun(id) {
+        if (!this.db) return null;
+        const row = await this.db.get(`SELECT * FROM model_benchmarks WHERE id = ?`, [id]);
+        if (!row) return null;
+        return {
+            ...row,
+            summary: (() => { try { return JSON.parse(row.summary); } catch { return null; } })(),
+            details: (() => { try { return JSON.parse(row.details); } catch { return []; } })()
+        };
+    }
+
+    async markBenchmarkPromoted(id) {
+        if (!this.db) return;
+        await this.db.run(`UPDATE model_benchmarks SET promoted = 1 WHERE id = ?`, [id]);
     }
 }
 

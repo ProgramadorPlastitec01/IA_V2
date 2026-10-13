@@ -12,9 +12,13 @@ import AboutRitaModal from './AboutRitaModal.jsx';
 import { HandsHelpingIcon, FlaskIcon, SyncAltIcon, HourglassHalfIcon, LockIcon, PenIcon } from './shared.jsx';
 
 // Kiosco compartido: si hay una pregunta/respuesta o un borrador de sugerencia
-// en pantalla y nadie interactúa en 5 minutos, se avisa con cuenta regresiva
+// en pantalla y nadie interactúa en 60 segundos, se avisa con cuenta regresiva
 // antes de reiniciar — así la siguiente persona no hereda la consulta anterior.
-const INACTIVITY_WARNING_MS = 5 * 60 * 1000;
+// El reloj de esos 60s se reinicia explícitamente en cuanto RITA entrega una
+// respuesta (ver onAnswerDelivered más abajo), no solo con actividad genérica
+// del mouse/touch — si no, el tiempo que tarda el LLM en responder (varios
+// segundos) se comía parte de la ventana antes de que la persona pudiera leer.
+const INACTIVITY_WARNING_MS = 60 * 1000;
 const INACTIVITY_COUNTDOWN_S = 10;
 
 const VIEW_TITLES = {
@@ -57,12 +61,14 @@ const KioskApp = () => {
 
     const navigateTo = useCallback((nextView) => {
         setView(nextView);
+        setHasContent(false);
         lastInteractionRef.current = Date.now();
     }, []);
 
     const handlePickFaq = useCallback((question) => {
         setPendingAutoQuery(question);
         setView('chat');
+        setHasContent(false);
         lastInteractionRef.current = Date.now();
     }, []);
 
@@ -100,8 +106,9 @@ const KioskApp = () => {
     }, []);
 
     // ── Seguimiento de interacción global (para el aviso de inactividad) ───
+    const markInteraction = useCallback(() => { lastInteractionRef.current = Date.now(); }, []);
+
     useEffect(() => {
-        const markInteraction = () => { lastInteractionRef.current = Date.now(); };
         window.addEventListener('mousemove', markInteraction, { passive: true });
         window.addEventListener('touchstart', markInteraction, { passive: true });
         window.addEventListener('keydown', markInteraction);
@@ -112,7 +119,7 @@ const KioskApp = () => {
             window.removeEventListener('keydown', markInteraction);
             window.removeEventListener('click', markInteraction);
         };
-    }, []);
+    }, [markInteraction]);
 
     const startInactivityCountdown = useCallback(() => {
         setShowInactivityModal(true);
@@ -133,16 +140,19 @@ const KioskApp = () => {
     };
 
     // Solo advierte si hay contenido real en pantalla que se perdería (una
-    // respuesta activa o un borrador de sugerencia sin enviar).
+    // respuesta activa o un borrador de sugerencia sin enviar), y solo en las
+    // vistas que rastrean ese contenido (chat y buzón de sugerencias) — en
+    // Inicio, Documentos, FAQs o Guía nunca debe aparecer este aviso.
     useEffect(() => {
+        const tracksContent = view === 'chat' || view === 'suggestions';
         const interval = setInterval(() => {
-            if (!hasContent || showInactivityModal) return;
+            if (!tracksContent || !hasContent || showInactivityModal) return;
             if (Date.now() - lastInteractionRef.current >= INACTIVITY_WARNING_MS) {
                 startInactivityCountdown();
             }
         }, 5000);
         return () => clearInterval(interval);
-    }, [hasContent, showInactivityModal, startInactivityCountdown]);
+    }, [view, hasContent, showInactivityModal, startInactivityCountdown]);
 
     useEffect(() => () => {
         clearTimeout(confirmResetTimerRef.current);
@@ -167,6 +177,7 @@ const KioskApp = () => {
                         autoQuery={pendingAutoQuery}
                         onAutoQueryConsumed={() => setPendingAutoQuery(null)}
                         onContentChange={setHasContent}
+                        onAnswerDelivered={markInteraction}
                         resetSignal={resetSignal}
                     />
                 );

@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { API_BASE_URL } from '../utils/apiConfig';
 import SystemStatus from './SystemStatus';
+import SystemErrorsTab from './admin/SystemErrorsTab';
+import ModelValidationTab from './admin/ModelValidationTab';
+import CorpusGapsTab from './admin/CorpusGapsTab';
+import { ZapIcon, NewBadge, FlaskIcon, FileSearchIcon } from './admin/AdminUI';
 
 const AnalyticsDashboard = ({ onClose }) => {
     const [events, setEvents] = useState([]);
@@ -10,8 +14,7 @@ const AnalyticsDashboard = ({ onClose }) => {
     const [systemErrors, setSystemErrors] = useState([]);
     const [suggestions, setSuggestions] = useState([]);
     const [ratingStats, setRatingStats] = useState({ totals: [], recent: [] });
-    const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'system' | 'errors' | 'feedback'
-    const [errorFilter, setErrorFilter] = useState('all'); // 'all' | 'Mic'
+    const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'system' | 'errors' | 'feedback' | 'models' | 'corpus-gaps'
     const [suggestionTypeFilter, setSuggestionTypeFilter] = useState('all');
 
     const fetchAnalytics = async () => {
@@ -56,19 +59,6 @@ const AnalyticsDashboard = ({ onClose }) => {
             if (data.totals) setRatingStats(data);
         } catch (err) {
             console.error('Error fetching rating stats:', err);
-        }
-    };
-
-    const resolveError = async (id) => {
-        try {
-            const res = await fetch(`${API_BASE_URL}/api/system-errors/resolve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id })
-            });
-            if (res.ok) fetchSystemErrors();
-        } catch (err) {
-            console.error('Error resolving error:', err);
         }
     };
 
@@ -119,16 +109,6 @@ const AnalyticsDashboard = ({ onClose }) => {
         return 'bg-surface text-muted border-line';
     };
 
-    const getDeviceInfo = (ua) => {
-        if (!ua) return 'Unknown Device';
-        if (ua.includes('iPhone')) return '📱 iPhone';
-        if (ua.includes('iPad')) return 'tablet iPad';
-        if (ua.includes('Android')) return ua.includes('wv') ? '📱 Android (WV)' : '📱 Android';
-        if (ua.includes('Windows')) return '💻 Windows';
-        if (ua.includes('Macintosh')) return '💻 Mac';
-        return '🖥️ Desktop/Other';
-    };
-
     const SUGGESTION_TYPE_LABELS = {
         sugerencia: { label: '💡 Sugerencia', cls: 'bg-cat-amber-fill text-cat-amber border-cat-amber/30' },
         respuesta_incorrecta: { label: '⚠️ Resp. Incorrecta', cls: 'bg-cat-coral-fill text-cat-coral border-cat-coral/30' },
@@ -139,78 +119,79 @@ const AnalyticsDashboard = ({ onClose }) => {
     const RATING_LABELS = { good: '😊 Buena', neutral: '😐 Más o menos', bad: '😞 No sirvió' };
     const ratingCount = (r) => ratingStats.totals.find(t => t.rating === r)?.count || 0;
 
-    const getBrowserInfo = (ua) => {
-        if (!ua) return '---';
-        if (ua.includes('Edg/')) return 'Edge';
-        if (ua.includes('Chrome/')) return 'Chrome';
-        if (ua.includes('Safari/') && !ua.includes('Chrome/')) return 'Safari';
-        if (ua.includes('Firefox/')) return 'Firefox';
-        return 'Other';
-    };
-
     return (
         <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            className="fixed inset-0 z-50 bg-bg-page flex flex-col p-6 overflow-hidden text-ink"
+            className="fixed inset-0 z-50 bg-admin-bg flex flex-col p-6 overflow-hidden text-admin-ink font-admin-sans"
         >
             {/* Header */}
-            <div className="flex justify-between items-center mb-6 border-b border-line pb-4">
-                <div>
-                    <h1 className="text-2xl font-medium text-brand">
-                        ⚡ Admin Dashboard
-                    </h1>
-                    <p className="text-xs text-muted mt-1">System &amp; Analytics Console</p>
+            <div className="flex justify-between items-center mb-6 border-b border-admin-border pb-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-admin-accent text-white flex items-center justify-center flex-shrink-0">
+                        <ZapIcon size={18} />
+                    </div>
+                    <div>
+                        <h1 className="text-lg font-semibold text-admin-ink leading-tight">Admin Dashboard</h1>
+                        <p className="text-xs text-admin-muted">System &amp; Analytics Console</p>
+                    </div>
                 </div>
                 <button
                     onClick={onClose}
-                    className="px-4 py-2 bg-bg-panel hover:bg-surface border border-line rounded-lg text-ink transition-colors"
+                    className="px-4 py-2 bg-admin-card hover:bg-admin-bg border border-admin-border rounded-lg text-admin-ink text-sm transition-colors"
                 >
                     Cerrar [ESC]
                 </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-4 mb-6">
-                <button
-                    onClick={() => setActiveTab('analytics')}
-                    className={`px-6 py-3 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-brand text-white shadow-[0_2px_12px_rgba(24,95,165,0.25)]' : 'bg-bg-panel border border-line text-muted hover:bg-surface'}`}
-                >
-                    📊 Estadísticas de Uso
-                </button>
-                <button
-                    onClick={() => setActiveTab('system')}
-                    className={`px-6 py-3 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'system' ? 'bg-cat-green text-white shadow-[0_2px_12px_rgba(15,110,86,0.25)]' : 'bg-bg-panel border border-line text-muted hover:bg-surface'}`}
-                >
-                    🖥️ Estado de Servicios
-                </button>
-                <button
-                    onClick={() => setActiveTab('errors')}
-                    className={`px-6 py-3 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'errors' ? 'bg-cat-coral text-white shadow-[0_2px_12px_rgba(153,60,29,0.25)]' : 'bg-bg-panel border border-line text-muted hover:bg-surface'}`}
-                >
-                    🚨 Errores del Sistema
-                    {systemErrors.filter(e => e.status === 'pending').length > 0 && (
-                        <span className="bg-cat-coral text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] animate-pulse">
-                            {systemErrors.filter(e => e.status === 'pending').length}
-                        </span>
-                    )}
-                </button>
-                <button
-                    onClick={() => setActiveTab('feedback')}
-                    className={`px-6 py-3 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'feedback' ? 'bg-cat-purple text-white shadow-[0_2px_12px_rgba(83,74,183,0.25)]' : 'bg-bg-panel border border-line text-muted hover:bg-surface'}`}
-                >
-                    💬 Buzón y Calificaciones
-                    {suggestions.filter(s => s.status === 'nuevo').length > 0 && (
-                        <span className="bg-cat-purple text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">
-                            {suggestions.filter(s => s.status === 'nuevo').length}
-                        </span>
-                    )}
-                </button>
+            <div className="flex flex-wrap gap-3 mb-6">
+                {[
+                    { key: 'analytics', label: 'Estadísticas de Uso' },
+                    { key: 'system', label: 'Estado de Servicios' },
+                    { key: 'errors', label: 'Errores del Sistema', count: systemErrors.filter(e => e.status === 'pending').length },
+                    { key: 'feedback', label: 'Buzón y Calificaciones', count: suggestions.filter(s => s.status === 'nuevo').length },
+                ].map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 border ${activeTab === tab.key ? 'bg-admin-accent text-white border-admin-accent' : 'bg-admin-card border-admin-border text-admin-muted hover:bg-admin-bg'}`}
+                    >
+                        {tab.label}
+                        {tab.count > 0 && (
+                            <span className={`rounded-full w-5 h-5 flex items-center justify-center text-[10px] ${activeTab === tab.key ? 'bg-white/20' : 'bg-admin-error text-white'}`}>
+                                {tab.count}
+                            </span>
+                        )}
+                    </button>
+                ))}
+                {[
+                    { key: 'models', label: 'Validación de Modelos IA', icon: FlaskIcon },
+                    { key: 'corpus-gaps', label: 'Huecos del Corpus', icon: FileSearchIcon },
+                ].map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.key;
+                    return (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all flex items-center gap-2 border ${isActive ? 'bg-admin-accent text-white border-admin-accent' : 'bg-admin-accent-soft border-dashed border-admin-accent-dash text-admin-accent hover:bg-admin-accent-soft/70'}`}
+                        >
+                            <Icon size={15} />
+                            {tab.label}
+                            <NewBadge />
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Content Area */}
             <div className="flex-grow overflow-hidden flex flex-col">
-                {activeTab === 'system' ? (
+                {activeTab === 'models' ? (
+                    <ModelValidationTab />
+                ) : activeTab === 'corpus-gaps' ? (
+                    <CorpusGapsTab />
+                ) : activeTab === 'system' ? (
                     <SystemStatus />
                 ) : activeTab === 'feedback' ? (
                     <div className="flex-grow overflow-auto custom-scrollbar space-y-8 pb-4">
@@ -321,92 +302,7 @@ const AnalyticsDashboard = ({ onClose }) => {
                         </div>
                     </div>
                 ) : activeTab === 'errors' ? (
-                    <div className="flex-grow flex flex-col overflow-hidden">
-                        <div className="bg-bg-panel rounded-xl border border-line overflow-hidden flex flex-col flex-grow">
-                            <div className="px-6 py-4 border-b border-line bg-surface flex justify-between items-center">
-                                <h3 className="text-sm font-medium text-ink">System Error Log</h3>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setErrorFilter('all')}
-                                        className={`px-3 py-1 rounded text-[10px] border transition-all ${errorFilter === 'all' ? 'bg-surface border-line text-ink' : 'border-transparent text-muted'}`}
-                                    >
-                                        Todos
-                                    </button>
-                                    <button
-                                        onClick={() => setErrorFilter('Mic')}
-                                        className={`px-3 py-1 rounded text-[10px] border transition-all ${errorFilter === 'Mic' ? 'bg-cat-amber-fill border-cat-amber/40 text-cat-amber' : 'border-transparent text-muted'}`}
-                                    >
-                                        🎙️ Mic Errs
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="overflow-auto p-4 space-y-3 custom-scrollbar">
-                                {systemErrors.length === 0 ? (
-                                    <div className="text-center py-20 text-muted italic">No se han registrado errores aún.</div>
-                                ) : (
-                                    systemErrors
-                                        .filter(err => errorFilter === 'all' || err.type === errorFilter)
-                                        .map((err) => (
-                                            <motion.div
-                                                key={err.id}
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                className={`p-4 rounded-xl border ${err.status === 'resolved' ? 'bg-cat-green-fill border-cat-green/20 opacity-70' : 'bg-cat-coral-fill border-cat-coral/20'} flex flex-col md:flex-row gap-4`}
-                                            >
-                                                <div className="flex-shrink-0 w-32">
-                                                    <div className="text-[10px] text-muted mb-1 tabular-nums">{new Date(err.timestamp).toLocaleString()}</div>
-                                                    <span className={`px-2 py-0.5 rounded text-[8px] font-medium uppercase ${err.type === 'Mic' ? 'bg-cat-amber-fill text-cat-amber' : 'bg-cat-coral-fill text-cat-coral'}`}>
-                                                        {err.type}
-                                                    </span>
-                                                </div>
-                                                <div className="flex-grow">
-                                                    <div className="text-xs font-medium text-ink mb-1">[{err.module}] {err.message}</div>
-
-                                                    <div className="flex flex-wrap gap-2 mb-2">
-                                                        <div className="px-1.5 py-0.5 bg-surface rounded text-[9px] text-muted border border-line">
-                                                            {getDeviceInfo(err.details?.userAgent)}
-                                                        </div>
-                                                        <div className="px-1.5 py-0.5 bg-surface rounded text-[9px] text-muted border border-line">
-                                                            🌐 {getBrowserInfo(err.details?.userAgent)}
-                                                        </div>
-                                                        {err.details?.phase && (
-                                                            <div className="px-1.5 py-0.5 bg-brand-light rounded text-[9px] text-brand border border-brand/20">
-                                                                Phase: {err.details.phase}
-                                                            </div>
-                                                        )}
-                                                        {err.details?.isSecure === false && (
-                                                            <div className="px-1.5 py-0.5 bg-cat-coral-fill rounded text-[9px] text-cat-coral font-medium border border-cat-coral/20">
-                                                                ⚠️ INSECURE CONTEXT
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {err.stack && (
-                                                        <pre className="text-[9px] text-muted bg-surface p-2 rounded overflow-x-auto font-mono whitespace-pre-wrap border border-line">
-                                                            {err.stack}
-                                                        </pre>
-                                                    )}
-                                                </div>
-                                                <div className="flex-shrink-0 flex items-center justify-end">
-                                                    {err.status === 'pending' ? (
-                                                        <button
-                                                            onClick={() => resolveError(err.id)}
-                                                            className="px-4 py-2 bg-cat-green-fill hover:bg-cat-green hover:text-white border border-cat-green/30 rounded-lg text-cat-green text-[10px] font-medium transition-all"
-                                                        >
-                                                            Marcar Resuelto
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-cat-green text-[10px] flex items-center gap-1 italic">
-                                                            ✅ Resuelto
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </motion.div>
-                                        ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <SystemErrorsTab onNavigateToCorpusGaps={() => setActiveTab('corpus-gaps')} />
                 ) : (
                     <>
                         {/* KPI Cards */}

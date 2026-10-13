@@ -17,6 +17,44 @@
   src: url('./assets/fonts/inter-500.woff2') format('woff2');
 }
 
+/* IBM Plex Sans/Mono self-hosted (mismo criterio offline-safe que Inter arriba),
+   solo para el Admin Dashboard (AnalyticsDashboard y sub-vistas). */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/ibmplexsans-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/ibmplexsans-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./assets/fonts/ibmplexsans-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/ibmplexmono-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/ibmplexmono-500.woff2') format('woff2');
+}
+
 @theme {
   /* ════════════════════════════════════════════════════════════
      REDISEÑO 2026 — Sistema de tokens del chat de 2 paneles
@@ -101,6 +139,33 @@
   --animate-typing1: typingPulse 1s 0ms   ease-in-out infinite;
   --animate-typing2: typingPulse 1s 150ms ease-in-out infinite;
   --animate-typing3: typingPulse 1s 300ms ease-in-out infinite;
+
+  /* ════════════════════════════════════════════════════════════
+     ADMIN DASHBOARD (2026-10) — tokens namespaced admin-* para no
+     chocar con la paleta cat- / brand del resto del app. Usados por
+     AnalyticsDashboard y sus pestañas (Errores agrupados, Validación
+     de Modelos IA, Huecos del Corpus). Fiel al mockup validado.
+     ════════════════════════════════════════════════════════════ */
+  --font-admin-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-admin-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --color-admin-bg:           #F4F6F8;
+  --color-admin-card:         #FFFFFF;
+  --color-admin-border:       #E3E7EC;
+  --color-admin-ink:          #0F172A;
+  --color-admin-muted:        #5B6472;
+  --color-admin-faint:        #94A0AF;
+
+  --color-admin-accent:       #3D3A8C;
+  --color-admin-accent-soft:  #EDECF9;
+  --color-admin-accent-dash:  #B9B4EA;
+
+  --color-admin-success:      #1C7C54;
+  --color-admin-success-soft: #E7F6ED;
+  --color-admin-warning:      #B5680A;
+  --color-admin-warning-soft: #FDF1DD;
+  --color-admin-error:        #AD2E24;
+  --color-admin-error-soft:   #FBE8E6;
 }
 
 @layer base {

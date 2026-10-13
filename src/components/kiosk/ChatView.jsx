@@ -19,7 +19,7 @@ import {
  * diseño de referencia: vacío → procesando → encontrada / no encontrada / error.
  * Respaldo del layout de 2 paneles: backups/ui_2026-10-09/ChatShell_2panel_qa.jsx
  */
-const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onContentChange, resetSignal }) => {
+const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onContentChange, onAnswerDelivered, resetSignal }) => {
     const [answer, setAnswer] = useState(null); // { question, body, sources, raw, notFound }
     const [pendingQuestion, setPendingQuestion] = useState('');
     const [feedback, setFeedback] = useState(null); // null | 'good' | 'neutral' | 'bad'
@@ -185,12 +185,14 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
             const { body, sources } = splitAnswer(finalResult);
             const notFound = isNotFoundAnswer(body, sources);
             setAnswer({ question: queryText, body, sources, raw: finalResult, notFound });
+            onAnswerDelivered?.();
             if (!notFound && synthRef.current) { setAppState('RESPONDING'); speakText(body); }
             else setAppState('IDLE');
         } catch (err) {
             if (err.name === 'AbortError') { setAppState('IDLE'); return; }
             reportError('IA', 'handleQuery', err.message, err.stack, { query: queryText });
             setSystemError(err.message || 'Ocurrió un inconveniente al conectar con el servidor de consulta local.');
+            onAnswerDelivered?.();
             setAppState('IDLE');
         } finally {
             clearTimeout(step2); clearTimeout(step3);

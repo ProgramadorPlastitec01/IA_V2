@@ -21,16 +21,32 @@ import analyticsRoutes from './routes/analyticsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
+import modelBenchmarkRoutes from './routes/modelBenchmarkRoutes.js';
+import corpusGapsRoutes from './routes/corpusGapsRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const APP_ROOT = process.cwd();
 
 // --- RATE LIMITING ---
-const limiter = rateLimit({
+// Dos niveles: uno general (laxo) para todo /api — incluye el polling propio
+// del frontend (SystemStatus cada 30s, AnalyticsDashboard cada 10s x varios
+// endpoints, health checks) — y uno estricto solo para /api/query, la única
+// ruta que de verdad cuesta cara (invoca al LLM). Antes un único límite de
+// 100/15min para TODO /api se agotaba con el polling normal y tumbaba incluso
+// /api/health con 429, lo que el frontend mostraba como "Sin conexión".
+const generalLimiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 3000,
     message: { error: 'Demasiadas peticiones. Por favor intenta más tarde.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const queryLimiter = rateLimit({
+    windowMs: parseInt(process.env.QUERY_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+    max: parseInt(process.env.QUERY_RATE_LIMIT_MAX_REQUESTS) || 200,
+    message: { error: 'Demasiadas consultas. Por favor intenta más tarde.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -52,12 +68,15 @@ app.use(express.json());
 app.use('/AsistenteRRHH', express.static(path.join(APP_ROOT, 'dist')));
 
 // --- REGISTRO DE RUTAS ---
-app.use('/api', limiter); // Aplicar protección a toda la API
+app.use('/api', generalLimiter); // Protección laxa para toda la API
+app.use('/api/query', queryLimiter); // Protección estricta solo para la ruta cara (LLM)
 app.use('/api', chatRoutes);
 app.use('/api', analyticsRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', systemRoutes);
 app.use('/api', feedbackRoutes);
+app.use('/api', modelBenchmarkRoutes);
+app.use('/api', corpusGapsRoutes);
 
 // --- SPA FALLBACK ---
 app.get(/\/AsistenteRRHH($|\/.*)/, (req, res, next) => {
