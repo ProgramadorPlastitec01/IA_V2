@@ -916,13 +916,41 @@ class RagService {
             const indices = neighborIndicesBySource.get(src);
             indices.add(idx - 1);
             indices.add(idx + 1);
-            
+
             // Section Reconstruction: si el chunk parece un título, traer los siguientes
             const text = (c.payload.texto_original || '').trim();
             const isShortHeader = text.length < 120 && /^[A-ZÁÉÍÓÚÑ\s\-:.]{5,}$/.test(text.split('\n')[0]);
             if (isShortHeader) {
                 for (let r = 1; r <= 3; r++) indices.add(idx + r);
             }
+        });
+
+        // ── Artículo completo (críticos Y de soporte) ─────────────────────
+        // (2026-10-14) Artículos largos del RIT quedan fragmentados en muchos
+        // chunks consecutivos por `_semanticChunkingByArticle` (ej. Art. 23
+        // "Horario de Trabajo": 12 fragmentos — horario administrativo,
+        // personal operativo, casos especiales de embarazo/adolescentes,
+        // parágrafos legales). El radio ±1 de arriba solo corre para los 2
+        // chunks "críticos" (top rank); si el fragmento con más relevancia
+        // léxica (ej. el horario vigente) rankea como SOPORTE (rank 3-6) en
+        // vez de crítico, nunca dispara neighbor retrieval y el fragmento
+        // relevante puede quedar a 3+ posiciones de distancia — fuera del
+        // radio ±1 de todas formas. Hallazgo real (2026-10-14): "¿cuál es el
+        // horario de trabajo?" respondía solo el horario administrativo, sin
+        // mencionar personal operativo ni los descansos especiales de
+        // embarazadas. Fix: para CUALQUIER chunk (crítico o soporte) que
+        // pertenezca a un artículo numerado, traer TODOS sus fragmentos por
+        // section_title — no solo los vecinos por índice.
+        const articleGroupsFetched = new Set(); // "fuente::section_title" ya pedidos
+        const articleSections = [];
+        [...criticalChunks, ...supportChunks].forEach(c => {
+            const src = c.payload.fuente;
+            const sectionTitle = c.payload.metadata?.section_title || '';
+            if (!/^ART[IÍ]CULO/i.test(sectionTitle)) return;
+            const key = `${src}::${sectionTitle}`;
+            if (articleGroupsFetched.has(key)) return;
+            articleGroupsFetched.add(key);
+            articleSections.push({ source: src, sectionTitle });
         });
 
         // ── Recuperar chunks vecinos ───────────────────────────────
@@ -937,30 +965,38 @@ class RagService {
                 console.error(`   ⚠️ Fallo neighbor retrieval para ${source}: ${err.message}`);
             }
         }
+        for (const { source, sectionTitle } of articleSections) {
+            try {
+                const payloads = await qdrantService.fetchPointsBySectionTitle(source, sectionTitle);
+                neighborPayloads.push(...payloads);
+            } catch (err) {
+                console.error(`   ⚠️ Fallo fetch de artículo completo (${sectionTitle}) para ${source}: ${err.message}`);
+            }
+        }
 
         // ── Ensamblaje Inteligente (Sin Truncamiento Bruto) ──────────────────
         let currentChars = 0;
-        const assembledSources = new Map(); // source -> set of texts
+        const assembledSources = new Map(); // source -> Map<text, {chunkIndex, isCritical}>
 
-        const addChunkToContext = (source, text, isCritical = false) => {
+        const addChunkToContext = (source, text, chunkIndex, isCritical = false) => {
             const clean = this._cleanText(text || '');
             if (clean.length < 10) return true;
-            
-            if (!assembledSources.has(source)) assembledSources.set(source, new Set());
-            const set = assembledSources.get(source);
-            if (set.has(clean)) return true; // ya existe, continuar buscando espacio
+
+            if (!assembledSources.has(source)) assembledSources.set(source, new Map());
+            const map = assembledSources.get(source);
+            if (map.has(clean)) return true; // ya existe, continuar buscando espacio
 
             if (currentChars + clean.length > MAX_CONTEXT_CHARS && !isCritical) {
                 return false; // No hay espacio
             }
 
-            set.add(clean);
+            map.set(clean, { chunkIndex, isCritical });
             currentChars += clean.length;
             return true;
         };
 
         // 1. Agregar Chunks Críticos (siempre entran)
-        criticalChunks.forEach(c => addChunkToContext(c.payload.fuente, c.payload.texto_original, true));
+        criticalChunks.forEach(c => addChunkToContext(c.payload.fuente, c.payload.texto_original, c.payload.chunk_index, true));
 
         // 2. Agregar Vecinos de Críticos (si hay espacio)
         // BUG CORREGIDO (2026-08-14): `break` cortaba el ensamblaje entero apenas
@@ -970,18 +1006,34 @@ class RagService {
         // por domainBoost) que llegaba más tarde en el orden. `continue` prueba
         // todos los candidatos restantes contra el presupuesto disponible.
         for (const p of neighborPayloads) {
-            addChunkToContext(p.fuente, p.texto_original, false);
+            addChunkToContext(p.fuente, p.texto_original, p.chunk_index, false);
         }
 
         // 3. Agregar Chunks de Soporte (si hay espacio) — ver mismo fix arriba.
         for (const c of supportChunks) {
-            addChunkToContext(c.payload.fuente, c.payload.texto_original, false);
+            addChunkToContext(c.payload.fuente, c.payload.texto_original, c.payload.chunk_index, false);
         }
 
+        // (2026-10-14) Antes el resto (vecinos + soporte) se escribía en orden
+        // de inserción, lo que dejaba artículos fragmentados (ej. RIT Art. 23,
+        // 12 chunks) salpicados fuera de orden ("ARTICULO 23." intercalado con
+        // Art. 113/22/29, y "Personal operativo" lejos del horario
+        // administrativo) — dificultaba que el LLM sintetizara una respuesta
+        // completa aunque TODO el contenido ya estuviera en el contexto. Los
+        // chunks CRÍTICOS (más relevantes) se mantienen primero, en su propio
+        // orden de relevancia; el resto se ordena por chunk_index entre sí
+        // para que los fragmentos del mismo artículo queden contiguos y en su
+        // orden natural del documento, sin tocar QUÉ chunks entran (eso ya se
+        // decidió arriba) ni degradar la prioridad de lo más relevante.
         let finalContextText = '';
-        for (const [source, texts] of assembledSources.entries()) {
+        for (const [source, textMap] of assembledSources.entries()) {
             finalContextText += `\n[[ FUENTE: ${source} ]]\n`;
-            texts.forEach(t => finalContextText += `\n${t}\n`);
+            const entries = Array.from(textMap.entries());
+            const critical = entries.filter(([, info]) => info.isCritical);
+            const rest = entries
+                .filter(([, info]) => !info.isCritical)
+                .sort(([, a], [, b]) => (a.chunkIndex ?? 0) - (b.chunkIndex ?? 0));
+            [...critical, ...rest].forEach(([t]) => finalContextText += `\n${t}\n`);
             finalContextText += '\n' + '─'.repeat(50) + '\n';
         }
 

@@ -412,6 +412,51 @@ class QdrantService {
     }
 
     /**
+     * Recupera TODOS los chunks de una fuente que comparten el mismo
+     * metadata.section_title — pensado para artículos largos fragmentados en
+     * muchos chunks por `_semanticChunkingByArticle` (ej. RIT Art. 23
+     * "Horario de Trabajo", partido en 12 fragmentos consecutivos: horario
+     * administrativo, personal operativo, casos especiales —embarazo,
+     * adolescentes—, parágrafos legales). El radio ±1 de
+     * `fetchPointsByIndices` no alcanza cuando el fragmento relevante queda
+     * 3+ posiciones del chunk que sí rankeó bien (hallazgo 2026-10-14:
+     * "¿cuál es el horario de trabajo?" respondía solo el horario
+     * administrativo, sin mencionar personal operativo ni casos especiales,
+     * porque ese fragmento rankeaba como "soporte" —no "crítico"— y su
+     * vecino real quedaba fuera del radio ±1). Trayendo TODOS los fragmentos
+     * del mismo artículo se garantiza cobertura completa sin depender de
+     * cuán lejos esté el fragmento relevante en el orden de chunking.
+     */
+    async fetchPointsBySectionTitle(source, sectionTitle, limit = 20) {
+        if (!sectionTitle) return [];
+
+        return await this._withRetry(async () => {
+            const response = await fetch(
+                `${this.url}/collections/${this.collection}/points/scroll`,
+                {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filter: {
+                            must: [
+                                { key: 'fuente', match: { value: source } },
+                                { key: 'metadata.section_title', match: { value: sectionTitle } },
+                            ],
+                        },
+                        with_payload: true,
+                        limit,
+                    }),
+                }
+            );
+
+            if (!response.ok) throw new Error(await response.text());
+            const result = await response.json();
+            return (result.result?.points || []).map(p => p.payload);
+
+        }, 'fetchPointsBySectionTitle');
+    }
+
+    /**
      * Recupera todos los chunks de una fuente específica (ordenados por chunk_index).
      * Útil para reconstrucción de contexto completo.
      */
