@@ -22,6 +22,7 @@ import answerVerifier from './answerVerifier.js';
 import citationBuilder from './citationBuilder.js';
 import ragLogger from './ragLogger.js';
 import { runOnOllama } from '../utils/ollamaGate.js';
+import { isCompoundQuestion } from '../utils/textProcessor.js';
 import { sentencePrefixKey } from '../utils/sentenceKey.js';
 
 dotenv.config();
@@ -333,7 +334,7 @@ Si hay una INTERPRETACIÓN DE LA PREGUNTA que la relaciona con un tema del CONTE
      * Etapa 2: Generación guiada por Evidencia
      * Etapa 3: Validadores post-generación
      */
-    async generateRAGResponse(question, context, session = null, retrievalConfidence = 0, sources = [], interpretationHints = []) {
+    async generateRAGResponse(question, context, session = null, retrievalConfidence = 0, sources = [], interpretationHints = [], sourceTexts = null) {
         this._log('info', 'Iniciando Pipeline Tri-Estado (CoT XML)', { questionLen: question.length });
 
         // Notas de interpretación (2026-10-08, config/slangRules.js): qué
@@ -354,7 +355,7 @@ REGLAS DE CLASIFICACIÓN:
 - NO_INFORMATION_FOUND: El SUSTANTIVO PRINCIPAL O TEMA CENTRAL (ej. "drones", "España", "SAP") no existe en absoluto en el contexto.
 
 REGLA ESPECIAL — PREGUNTAS COMPUESTAS (aplica SOLO a preguntas con varias sub-preguntas explícitas):
-Aplica ÚNICAMENTE cuando la pregunta contiene DOS O MÁS sub-preguntas explícitas y distintas conectadas con "y", "además", "también" o "asimismo" (ej.: "¿Qué hago en caso de accidente Y cuántos días de incapacidad me dan?").
+Aplica ÚNICAMENTE cuando la pregunta contiene DOS O MÁS sub-preguntas explícitas y distintas, ya sea conectadas con "y", "además", "también" o "asimismo" (ej.: "¿Qué hago en caso de accidente Y cuántos días de incapacidad me dan?") o escritas como preguntas separadas, cada una con su propio signo de pregunta (ej.: "¿Qué área recibe los reportes? ¿Qué consecuencia tiene el incumplimiento?"). Responde cada sub-pregunta en el orden en que fue formulada.
 1. Evalúa CADA sub-pregunta de forma independiente contra el contexto.
 2. Si AL MENOS UNA sub-pregunta tiene respuesta en el contexto:
    → Clasifica como PARTIAL_MATCH (nunca NO_INFORMATION_FOUND).
@@ -391,6 +392,14 @@ El CONTEXTO DOCUMENTAL puede traer varios artículos o fragmentos de distintos t
 
 TRANSCRIPCIÓN DE TABLAS Y HORARIOS (2026-08-14):
 Si el CONTEXTO incluye una tabla o lista con días de la semana y horas (ej. "LUNES 7:30 AM A 5:00 PM"), NO la resumas con frases genéricas como "un horario específico" o "varía según el día". Transcribe los horarios exactos día por día tal como aparecen en la tabla — son el dato que el empleado está pidiendo.
+
+PROCEDIMIENTOS E INSTRUCTIVOS POR PASOS (2026-10-28):
+Si el CONTEXTO trae un procedimiento con "Paso N":
+1. Copia el número y el texto de cada paso EXACTAMENTE como están en el contexto: no renumeres, no unas ni dividas pasos.
+2. Los pasos de INGRESO y los de SALIDA son procedimientos distintos: si la pregunta es de uno, no uses los pasos del otro.
+3. Incluye las notas, normas y restricciones del instructivo que apliquen a la pregunta (ej. "no ingrese con maquillaje", "no la cofia").
+4. Usa solo lo que dice el instructivo del área o proceso por el que se pregunta; no agregues pasos, objetos o lugares que no estén escritos en el CONTEXTO.
+5. Si el CONTEXTO trae instructivos de VARIAS áreas (Negra, Gris, Blanca) y la pregunta no nombra una, responde por separado para cada área, indicando el nombre del área.
 
 FORMATO DE RESPUESTA OBLIGATORIO:
 <razonamiento>
@@ -599,6 +608,12 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
             }
         }
 
+        // Depuración opcional: respuesta cruda del modelo ANTES de B2/B3 (rawLength vs
+        // finalLength en los logs no distingue si el modelo o un guardrail descartó la respuesta).
+        if (process.env.LLM_DEBUG_RAW === '1') {
+            this._log('info', '[RAW]', { clasificacion, raw: String(respuestaFinal).slice(0, 900) });
+        }
+
         let b2RemovedPhrase = false; // B2 caso A: se quitó la frase "No encontré…" y quedó contenido
         // Contenido anclado a un documento (cita de artículo o "según el Reglamento/
         // instructivo/procedimiento…") vs. comentario vago sobre el contexto. Lo usan B2 y B3.
@@ -651,8 +666,18 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
                     // de palabras sale baja aunque el contenido esté anclado a un documento.
                     // En ese caso se trata como caso A y B3 decide si se rescata.
                     const restoAnclado = sinFrases.length >= 80 && ANCLADO.test(sinFrases) && !VAGO.test(sinFrases);
+                    // (2026-10-28) Pregunta compuesta: la nota "No encontré información
+                    // sobre: X" copia media pregunta (frasesCov≈0.5) y la respuesta cubre
+                    // solo la otra mitad (restoCov bajo) → el caso B la escalaba a NIF
+                    // total y se perdía la parte respondible (Ética: "¿qué área…? ¿qué
+                    // consecuencia…?"). Si hay contenido real en el resto, se conserva
+                    // tal cual: la nota indica QUÉ sub-pregunta falta.
+                    const compuesta = isCompoundQuestion(question);
+                    const restoUtil = sinFrases.length >= 40;
 
-                    if (frasesCov >= 0.5 && restoCov < 0.30 && !restoAnclado) {
+                    if (compuesta && restoUtil) {
+                        this._log('info', '[B2] Pregunta compuesta con contenido — se conserva respuesta parcial y nota', { frasesCov, restoCov });
+                    } else if (frasesCov >= 0.5 && restoCov < 0.30 && !restoAnclado) {
                         // CASO B — frase legítima: el resto no responde la query
                         // No eliminar; escalar a NIF para devolver mensaje estándar
                         clasificacion = 'NO_INFORMATION_FOUND';
@@ -723,10 +748,13 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
             const isRejection = _core.length < 10
                 || /^(no encontr[ée] informaci[oó]n|no se pudo extraer|no se encontr[oó] informaci[oó]n|no tengo (la )?informaci[oó]n)/i.test(_core)
                 || /hubo un problema interno/i.test(_core);
-            const evidence = (sources || []).filter(Boolean).map(s => ({ source: s }));
+            // Solo los documentos que respaldan la respuesta (no todo el top-6).
+            const usedSources = isRejection ? [] : citationBuilder.selectUsed(respuestaFinal, sourceTexts, sources);
+            const evidence = usedSources.filter(Boolean).map(s => ({ source: s }));
             return {
                 jsonFacts: { answer: respuestaFinal },
-                citations: isRejection ? '' : citationBuilder.build(evidence, retrievalConfidence)
+                citations: isRejection ? '' : citationBuilder.build(evidence, retrievalConfidence),
+                usedSources
             };
         }
     }

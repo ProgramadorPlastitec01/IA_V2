@@ -33,6 +33,8 @@ import responseTypeResolver from './responseTypeResolver.js';
 import responseBuilderService from './responseBuilderService.js';
 import citationValidator from './citationValidator.js';
 import { SYSTEM_MESSAGES } from '../config/systemMessages.js';
+import fs from 'fs';
+import { DOCS_DIR, isWholeDocSource, isAreaInstructivo, AREA_INSTRUCTIVOS } from '../config/corpusFiles.js';
 
 // ─── Vocabulario conocido para detección de gibberish ─────────────────────
 // Palabras HR/español que indican que la query tiene sentido.
@@ -102,6 +104,18 @@ const SPANISH_STOPWORDS = new Set([
 ]);
 
 const EXACT_ACRONYMS = ['copasst', 'sg-sst', 'sgsst', 'sagrilaft', 'oea', 'bpm', 'rit'];
+
+// Instructivos de ingreso por área (la pregunta nombra "área gris/negra/blanca"
+// o el código I-RH-009/010/011). Ver _detectDocPriority y _isAreaProcedureQuestion.
+const AREA_DOCS = [
+    { doc: 'i-rh-009', re: /(?<![\p{L}\p{N}])(i-?rh-?0?09|(?:[aá]reas?|zonas?)\s+gris(?:es)?)(?![\p{L}\p{N}])/iu },
+    { doc: 'i-rh-010', re: /(?<![\p{L}\p{N}])(i-?rh-?0?10|(?:[aá]reas?|zonas?)\s+negras?)(?![\p{L}\p{N}])/iu },
+    { doc: 'i-rh-011', re: /(?<![\p{L}\p{N}])(i-?rh-?0?11|(?:[aá]reas?|zonas?)\s+blancas?)(?![\p{L}\p{N}])/iu },
+];
+// Vocabulario de vestier/ingreso que comparten los tres instructivos de área.
+const AREA_PROCEDURE_RE = /(?<![\p{L}])(vestier|ropa\s+de\s+calle|joyas?|blusa|cofia|polainas?|escafandra|uniforme|overol|locker)(?![\p{L}])/iu;
+const VISIT_RE = /(?<![\p{L}])(visitantes?|visitas?|planta\s*2)(?![\p{L}])/iu;
+const AREA_CONTEXT_CHARS = 2800; // tope por área en el contexto "por área"
 
 const DOC_PRIORITY_MAP = [
     {
@@ -523,7 +537,7 @@ class RagService {
 
             // ── ETAPA 5: Construcción de contexto & Retrieval Confidence ──
             const startContext = Date.now();
-            const { contextText, chunksUsed, sources, rawConfidence, bestKeywordScore, bestHasSectionRelevance, logDetails } =
+            const { contextText, chunksUsed, sources, sourceTexts, extraHints, rawConfidence, bestKeywordScore, bestHasSectionRelevance, logDetails } =
                 await this._buildContextExpanded(reranked, query, keywords, expanded_terms);
             const contextMs = Date.now() - startContext;
 
@@ -669,9 +683,11 @@ class RagService {
 
             const startLLM = Date.now();
             let finalResponse;
+            let usedSourcesFinal = null; // fuentes que realmente respaldan la respuesta
 
             try {
-                const { jsonFacts, citations } = await llmService.generateRAGResponse(query, contextText, session, confidence, sources, interpretation_hints);
+                const { jsonFacts, citations, usedSources } = await llmService.generateRAGResponse(query, contextText, session, confidence, sources, [...interpretation_hints, ...(extraHints || [])], sourceTexts);
+                if (usedSources && usedSources.length > 0) usedSourcesFinal = usedSources;
                 let builtText = responseBuilderService.build(jsonFacts, responseType);
                 let finalCitations = citations;
 
@@ -732,7 +748,7 @@ class RagService {
                 keywords,
                 chunksUsed,
                 confidence:      safeConfidence,
-                sources:         sources || [],
+                sources:         usedSourcesFinal || sources || [],
                 metrics,
                 retrievalLogs:   logDetails,
                 context:         contextText,
@@ -763,6 +779,46 @@ class RagService {
             .filter(w => w.length > 2 && !SPANISH_STOPWORDS.has(w));
     }
 
+    /**
+     * Pista de dirección/alcance para preguntas sobre un instructivo de pasos:
+     * qwen 7B toma solo el paso más parecido (ej. "salida del área blanca" →
+     * solo el Paso 14) aunque el contexto traiga los Pasos 12-14.
+     */
+    _procedureHint(query) {
+        const q = String(query || '').toLowerCase();
+        const exit = /(?<![\p{L}])(salida|salir|salgo|retir\p{L}*)(?![\p{L}])/iu.test(q);
+        const entry = /(ingres|entrar|entrad|llega)/i.test(q);
+        const complete = /(procedimiento\s+completo|paso\s+a\s+paso|todos\s+los\s+pasos|qu[eé]\s+pasos|explique\s+el\s+procedimiento|cu[aá]l\s+es\s+el\s+procedimiento|procedimiento\s+de\s+(ingreso|salida))/i.test(q);
+        if (exit && !entry) {
+            return 'La pregunta es sobre la SALIDA: enumera TODOS los pasos de salida del instructivo (los que dicen "al salir", "retírese…", "retire…"), en orden y con su número de paso; no incluyas pasos de ingreso.';
+        }
+        if (complete) {
+            return 'La pregunta pide el procedimiento COMPLETO: enumera todos los pasos del instructivo, del primero al último, con su número, sin omitir ninguno, e incluye al final las notas y normas del instructivo. No digas que algo "no se especifica" si el instructivo ya lo indica.';
+        }
+        return null;
+    }
+
+    /** Archivo del corpus (en /docs) cuyo nombre cumple `re`. */
+    _findCorpusFile(re) {
+        if (!this._corpusFiles) {
+            try { this._corpusFiles = fs.readdirSync(DOCS_DIR); } catch { this._corpusFiles = []; }
+        }
+        return this._corpusFiles.find(f => re.test(f));
+    }
+
+    /**
+     * ¿Pregunta de vestier/ingreso que NO nombra el área (negra/gris/blanca) ni
+     * es de visitantes? Los tres instructivos aplican y difieren, así que se
+     * responde por área en vez de tomar el mejor chunk de cualquiera de ellos.
+     */
+    _isAreaProcedureQuestion(query) {
+        const lower = String(query || '').toLowerCase();
+        if (AREA_DOCS.some(a => a.re.test(lower))) return false;
+        if (VISIT_RE.test(lower)) return false;
+        return AREA_PROCEDURE_RE.test(lower)
+            && /(ingres|entrar|entrad|vestier|procedimiento|\bpasos?\b|salir|salida)/i.test(lower);
+    }
+
     _detectDocPriority(query) {
         const lower = query.toLowerCase();
 
@@ -777,11 +833,6 @@ class RagService {
         // pasos de grises respondidos como de negras). Si la pregunta nombra
         // EXACTAMENTE un área (o su código), se sube solo ese instructivo y se
         // bajan los otros dos. Con varias áreas o ninguna → reglas de siempre.
-        const AREA_DOCS = [
-            { doc: 'i-rh-009', re: /(?<![\p{L}\p{N}])(i-?rh-?0?09|(?:[aá]reas?|zonas?)\s+gris(?:es)?)(?![\p{L}\p{N}])/iu },
-            { doc: 'i-rh-010', re: /(?<![\p{L}\p{N}])(i-?rh-?0?10|(?:[aá]reas?|zonas?)\s+negras?)(?![\p{L}\p{N}])/iu },
-            { doc: 'i-rh-011', re: /(?<![\p{L}\p{N}])(i-?rh-?0?11|(?:[aá]reas?|zonas?)\s+blancas?)(?![\p{L}\p{N}])/iu },
-        ];
         const areasHit = AREA_DOCS.filter(a => a.re.test(lower));
         if (areasHit.length === 1) {
             const target = areasHit[0].doc;
@@ -805,7 +856,7 @@ class RagService {
             { doc: 'i-rh-012',      re: /lavado\s+de\s+(las\s+)?manos/, penalize: ['bpm'] },
             { doc: 'i-rh-017',      re: /c[oó]digo\s+de\s+[eé]tica/ },
             { doc: 'i-rh-003',      re: /buenas\s+pr[aá]cticas\s+de\s+manufactura|(?<![\p{L}])bpm(?![\p{L}])|i-?rh-?0?03(?![\d])/u },
-            { doc: 'i-rh-006',      re: /visitas?\s+(a\s+la\s+)?planta\s*2|i-?rh-?0?06(?![\d])/ },
+            { doc: 'i-rh-006',      re: /visitas?\s+(a\s+la\s+)?planta\s*2|visitantes?|i-?rh-?0?06(?![\d])/ },
             { doc: 'i-rh-004',      re: /inducci[oó]n\s+(en\s+)?(sst|seguridad)|i-?rh-?0?04(?![\d])/ },
             { doc: 'rit_plastitec', re: /reglamento\s+interno|(?<![\p{L}])rit(?![\p{L}])/u },
         ];
@@ -907,6 +958,77 @@ class RagService {
             });
         }
 
+        // ── Instructivos cortos: documento completo / contexto por área ───────
+        // (2026-10-28, "Registro de errores" de los técnicos) Los instructivos
+        // de ≤ 8 KB se trocean en 4-8 chunks que separan reglas de sus notas
+        // (§15 del Código de Ética nunca entraba al contexto), pasos de ingreso
+        // de pasos de salida (Blancas) y el maquillaje del Paso 1 (Grises); y
+        // los chunks de áreas hermanas (textos casi idénticos) se mezclaban en
+        // el contexto ("zapatos en bolsa plástica" de Grises en Negras).
+        //  - Pregunta de vestier/ingreso SIN área nombrada → un bloque
+        //    etiquetado por cada área (Negra/Gris/Blanca) y se descartan los
+        //    chunks sueltos de esos instructivos.
+        //  - Chunk principal de un instructivo corto → se inyecta el documento
+        //    completo y se descartan los chunks de instructivos hermanos.
+        const confidenceChunks = [...criticalChunks, ...supportChunks]; // antes de descartar hermanos
+        const wholeDocPayloads = [];
+        const extraHints = []; // pistas para el LLM (no alteran el embedding)
+        const dropFamily = (pred) => {
+            for (const arr of [criticalChunks, supportChunks]) {
+                for (let i = arr.length - 1; i >= 0; i--) {
+                    if (pred(arr[i].payload.fuente)) arr.splice(i, 1);
+                }
+            }
+        };
+
+        if (this._isAreaProcedureQuestion(query)) {
+            // Solo los tres instructivos de área (no Visitas/Ética/Lavado): con 4 documentos
+            // casi idénticos el modelo se pierde (prueba 2026-10-28: respondía "sin información").
+            dropFamily(isWholeDocSource);
+            extraHints.push('La pregunta NO indica el área. Responde en tres secciones separadas — "Área Negra", "Área Gris" y "Área Blanca" — usando en cada una SOLO el bloque [INSTRUCTIVO ÁREA …] correspondiente del contexto; si un área no trae el dato, dilo en su sección.');
+            const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            const qTokens = [...new Set(norm(query).split(/[^a-z0-9ñ]+/).filter(w => w.length >= 4))];
+            for (const area of AREA_INSTRUCTIVOS) {
+                const file = this._findCorpusFile(area.re);
+                if (!file) continue;
+                try {
+                    const chunks = await qdrantService.fetchAllChunksFromSource(file);
+                    const ranked = chunks
+                        .map(c => ({ c, s: qTokens.filter(t => norm(c.texto_original).includes(t)).length }))
+                        .sort((a, b) => b.s - a.s);
+                    let used = 0;
+                    const keep = [];
+                    for (const { c } of ranked) {
+                        const len = (c.texto_original || '').length;
+                        if (used + len > AREA_CONTEXT_CHARS && keep.length > 0) continue;
+                        keep.push(c);
+                        used += len;
+                    }
+                    keep.sort((a, b) => (a.chunk_index || 0) - (b.chunk_index || 0));
+                    keep.forEach((c, i) => wholeDocPayloads.push(
+                        i === 0 ? { ...c, texto_original: `[INSTRUCTIVO ${area.label}]\n${c.texto_original}` } : c
+                    ));
+                } catch (err) {
+                    console.error(`   ⚠️ Fallo contexto por área (${area.label}): ${err.message}`);
+                }
+            }
+        } else {
+            const primary = criticalChunks[0];
+            if (primary && isWholeDocSource(primary.payload.fuente)) {
+                const src = primary.payload.fuente;
+                try {
+                    wholeDocPayloads.push(...await qdrantService.fetchAllChunksFromSource(src));
+                    dropFamily(f => f !== src && isWholeDocSource(f));
+                    if (isAreaInstructivo(src) || /i-rh-006/i.test(src)) {
+                        const hint = this._procedureHint(query);
+                        if (hint) extraHints.push(hint);
+                    }
+                } catch (err) {
+                    console.error(`   ⚠️ Fallo documento completo (${src}): ${err.message}`);
+                }
+            }
+        }
+
         // ── Neighbor Retrieval solo para críticos ─────────────────────────
         const neighborIndicesBySource = new Map();
         criticalChunks.forEach(c => {
@@ -995,6 +1117,9 @@ class RagService {
             return true;
         };
 
+        // 0. Instructivo completo / bloques por área (críticos, en orden de documento)
+        wholeDocPayloads.forEach(p => addChunkToContext(p.fuente, p.texto_original, p.chunk_index, true));
+
         // 1. Agregar Chunks Críticos (siempre entran)
         criticalChunks.forEach(c => addChunkToContext(c.payload.fuente, c.payload.texto_original, c.payload.chunk_index, true));
 
@@ -1057,7 +1182,10 @@ class RagService {
         // keywordScore puede quedar en 0 para TODOS los chunks empatados — de
         // ahí el desempate adicional por número de canales corroborantes.
         const channelCount = (c) => (c.searchType || '').split('+').filter(Boolean).length;
-        const usedChunks = criticalChunks.concat(supportChunks);
+        // Confianza sobre los chunks recuperados originalmente: el modo "por área"
+        // / documento completo descarta chunks de instructivos hermanos del
+        // contexto, pero siguen siendo la señal de relevancia del retrieval.
+        const usedChunks = confidenceChunks;
         const bestChunk = usedChunks.reduce((best, c) => {
             if (!best) return c;
             const bestScore = best.finalScore ?? 0;
@@ -1096,8 +1224,15 @@ class RagService {
 
         return {
             contextText: finalContextText.trim(),
-            chunksUsed:  criticalChunks.length + supportChunks.length,
-            sources:     Array.from(sourcesSet),
+            chunksUsed:  Array.from(assembledSources.values()).reduce((n, m) => n + m.size, 0),
+            // Solo documentos que realmente quedaron en el contexto (no los que
+            // fueron descartados por presupuesto o por ser instructivos hermanos).
+            extraHints,
+            sources:     Array.from(assembledSources.keys()),
+            // fuente → texto de sus chunks en el contexto (para citar solo lo usado)
+            sourceTexts: Object.fromEntries(
+                Array.from(assembledSources.entries()).map(([src, m]) => [src, Array.from(m.keys()).join('\n')])
+            ),
             rawConfidence:  bestChunk ? (bestChunk.finalScore ?? 0) : 0,
             bestKeywordScore,
             bestHasSectionRelevance: bestChunk ? (bestChunk.boostReason?.includes('Section') || false) : false,

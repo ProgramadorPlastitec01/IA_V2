@@ -20,3 +20,20 @@ export const EXCLUDED_FILES = new Set([
 
 export const isCorpusFile = (f) =>
     (f.endsWith('.pdf') || f.endsWith('.txt') || f.endsWith('.md')) && !EXCLUDED_FILES.has(f);
+
+// ── Instructivos cortos (2026-10-28) ────────────────────────────────────────
+// Documentos de ≤ ~8 KB (Visitas, Áreas Grises/Negras/Blancas, Lavado de Manos,
+// Código de Ética). Se trocean en 4-8 chunks que separan reglas de sus notas y
+// pasos de ingreso de pasos de salida; para estos documentos el contexto lleva
+// el instructivo COMPLETO (ragService._buildContextExpanded).
+export const WHOLE_DOC_RE = /i-rh-0(06|09|10|11|12|17)(?!\d)/i;
+export const isWholeDocSource = (fuente) => WHOLE_DOC_RE.test(fuente || '');
+
+// Instructivos de ingreso por área: textos casi idénticos entre sí ("Póngase la
+// blusa blanca", "Quítese la ropa de calle"), por eso no se deben mezclar.
+export const AREA_INSTRUCTIVOS = [
+    { re: /i-rh-010(?!\d)/i, label: 'ÁREA NEGRA' },
+    { re: /i-rh-009(?!\d)/i, label: 'ÁREA GRIS' },
+    { re: /i-rh-011(?!\d)/i, label: 'ÁREA BLANCA' },
+];
+export const isAreaInstructivo = (fuente) => AREA_INSTRUCTIVOS.some(a => a.re.test(fuente || ''));

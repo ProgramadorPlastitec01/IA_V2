@@ -41,6 +41,45 @@ class CitationBuilder {
         return hit ? hit.name : String(src).replace(/\.md$/i, '');
     }
 
+    /** Tokens distintivos (≥5 letras, sin tildes) de un texto. */
+    _tokens(text) {
+        const out = new Set();
+        String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .split(/[^a-z0-9ñ]+/)
+            .forEach(w => { if (w.length >= 5) out.add(w); });
+        return out;
+    }
+
+    /**
+     * Fuentes que realmente respaldan la respuesta (2026-10-28).
+     * `sources` trae TODOS los documentos del top-6 recuperado, aunque el LLM
+     * solo haya usado uno (prueba de técnicos: Visitas Planta 2 citaba
+     * "Áreas Blancas" y BPM; Celular citaba Conocimiento y BPM). Se mide qué
+     * fracción de las palabras distintivas de la respuesta aparece en el texto
+     * de cada documento y se conservan los que llegan al 60% del mejor.
+     *
+     * @param {string} answerText   - respuesta del LLM (con o sin bloque de citas)
+     * @param {Object} sourceTexts  - { fuente: texto de sus chunks en el contexto }
+     * @param {string[]} sources    - fuentes recuperadas
+     * @returns {string[]} fuentes usadas (nunca vacío si `sources` no lo estaba)
+     */
+    selectUsed(answerText, sourceTexts, sources) {
+        const list = (sources || []).filter(Boolean);
+        if (list.length <= 1 || !sourceTexts) return list;
+        const answerTokens = this._tokens(String(answerText || '').split(/\n\n---\n/)[0]);
+        if (answerTokens.size < 5) return list;
+
+        const coverage = list.map(src => {
+            const srcTokens = this._tokens(sourceTexts[src] || '');
+            let hits = 0;
+            answerTokens.forEach(w => { if (srcTokens.has(w)) hits++; });
+            return { src, cov: hits / answerTokens.size };
+        });
+        const best = Math.max(...coverage.map(c => c.cov));
+        if (best === 0) return list;
+        return coverage.filter(c => c.cov >= best * 0.6).map(c => c.src);
+    }
+
     /**
      * Construye un bloque de citas a partir de la evidencia JSON extraída.
      *

@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import DatabaseService from '../services/database.js';
 import PrivacyService, { CATEGORIES } from '../services/privacy.js';
 import ragService from '../services/ragService.js';
-import { cleanResponse } from '../utils/textProcessor.js';
+import { cleanResponse, isCompoundQuestion } from '../utils/textProcessor.js';
 import { logAnalyticsEvent, logErrorEvent } from '../utils/logger.js';
 import { SYSTEM_MESSAGES } from '../config/systemMessages.js';
 
@@ -22,7 +22,7 @@ import { SYSTEM_MESSAGES } from '../config/systemMessages.js';
 // MAX_QUERY_LENGTH: tope de caracteres de la consulta (defensa de backend).
 const CACHE_READ_ENABLED  = String(process.env.CACHE_READ_ENABLED  || 'false').toLowerCase() === 'true';
 const CACHE_WRITE_ENABLED = String(process.env.CACHE_WRITE_ENABLED || 'true').toLowerCase() === 'true';
-const MAX_QUERY_LENGTH = parseInt(process.env.MAX_QUERY_LENGTH, 10) || 200;
+const MAX_QUERY_LENGTH = parseInt(process.env.MAX_QUERY_LENGTH, 10) || 500;
 
 // ── H-01: Blocklist de inyección de prompt (2026-06-18) ─────────────────────
 // Detecta intentos de manipular las instrucciones del sistema ANTES de
@@ -85,7 +85,8 @@ const isQualityAnswer = (text) => {
 // borrar las fuentes junto con la nota.
 const stripFabricatedNote = (question, text) => {
     if (!text) return text;
-    const tieneConectores = /\b(y|adem[áa]s|tambi[ée]n|asimismo)\b/i.test(question || '');
+    const tieneConectores = isCompoundQuestion(question)
+        || /\b(y|adem[áa]s|tambi[ée]n|asimismo)\b/i.test(question || '');
     if (tieneConectores) return text; // pregunta compuesta legítima → conserva nota (Cat-I)
     const parts = String(text).split(/\n\n---\n/); // [respuesta, ...citas]
     const head = parts[0]
@@ -124,7 +125,7 @@ export const postQuery = async (req, res) => {
         }
 
         // 1.5. Validación de longitud (defensa de backend; DESPUÉS de privacidad,
-        //      ANTES del pipeline). Espejo del maxLength=200 del frontend.
+        //      ANTES del pipeline). Espejo del maxLength del frontend (500).
         if (query.length > MAX_QUERY_LENGTH) {
             logAnalyticsEvent('QueryRejected', { reason: 'too_long', length: query.length, limit: MAX_QUERY_LENGTH });
             return res.json({

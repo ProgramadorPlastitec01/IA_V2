@@ -38,8 +38,10 @@ export const FAQS = [
 export const FAQ_VISIBLE = 5;
 
 // Límite de longitud de consulta (espejo del MAX_QUERY_LENGTH del backend).
-export const MAX_QUERY_LENGTH = 200;
-export const COUNTER_THRESHOLD = 160;
+// (2026-10-28) 200 → 500: las preguntas dobles de los técnicos se cortaban a
+// media frase y la segunda pregunta se perdía.
+export const MAX_QUERY_LENGTH = 500;
+export const COUNTER_THRESHOLD = 400;
 
 // Separador que el backend pone antes del bloque de fuentes:
 // "...respuesta\n\n---\n📎 *Información extraída de:*\n- Doc A\n- Doc B"

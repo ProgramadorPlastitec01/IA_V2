@@ -76,3 +76,18 @@ export const isResponseInvalid = (text) => {
 export const reformulateQuery = (originalQuery) => {
     return `Respuesta directa y humana sobre: "${originalQuery}", consultando exclusivamente el Reglamento Interno de Trabajo y políticas de PLASTITEC. Sin introducciones.`;
 };
+
+/**
+ * ¿La consulta trae dos o más preguntas? (2026-10-28)
+ * Estricto a propósito: "ropa de calle y joyas" NO es compuesta; sí lo es
+ * "¿qué área…? ¿qué consecuencia…?" (dos signos de pregunta) o
+ * "¿qué hago en un accidente y cuántos días me dan?" (conector + segundo
+ * interrogativo). Lo usan llmService (B2) y chatController para no borrar una
+ * respuesta parcial ni la nota "No encontré información sobre: X" de la
+ * sub-pregunta que sí falta.
+ */
+export const isCompoundQuestion = (question) => {
+    const q = String(question || '');
+    if ((q.match(/\?/g) || []).length >= 2) return true;
+    return /\b(y|adem[áa]s|tambi[ée]n|asimismo)\s+(qu[ée]|cu[áa]l(es)?|c[óo]mo|cu[áa]ndo|cu[áa]nt[oa]s?|d[óo]nde|qui[ée]n(es)?|por\s+qu[ée]|puedo|debo|tengo|hay)\b/i.test(q);
+};

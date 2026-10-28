@@ -139,6 +139,18 @@ Desde 2026-08-14 la lectura y escritura son flags **independientes**:
 - `EXCLUDED_FILES` excluye documentos derogados (RIT anterior y su comunicado).
 - **Nota post-limpieza (oct. 2026)**: la documentación propia del proyecto (manuales técnicos, contexto, presentaciones) se movió a `/project-docs` para que **nunca** se indexe por error como si fuera contenido normativo de RRHH — antes de ese cambio, archivos de ese tipo en `/docs` sí habrían sido ingeridos al corpus.
 
+### Armado del contexto (`ragService._buildContextExpanded`)
+- **Artículos largos del RIT** (fragmentados en muchos chunks): si un chunk seleccionado pertenece a un artículo numerado, se traen todos sus fragmentos por `metadata.section_title` (`qdrantService.fetchPointsBySectionTitle`).
+- **Instructivos cortos** (I-RH-006/009/010/011/012/017, ≤ 8 KB; lista en `config/corpusFiles.js`): si el chunk principal es de uno de ellos, el contexto lleva el **instructivo completo** (`fetchAllChunksFromSource`) y se descartan los chunks sueltos de instructivos hermanos, para no mezclar pasos entre áreas.
+- **Pregunta de vestier/ingreso sin área nombrada**: se arma un bloque etiquetado por cada área (Negra, Gris, Blanca) y se le indica al LLM responder por separado (`_isAreaProcedureQuestion`).
+- **Pistas de procedimiento** (`_procedureHint`): para "salida" o "procedimiento completo" se instruye al LLM a enumerar todos los pasos.
+- **Fuentes citadas**: solo los documentos que respaldan la respuesta (`citationBuilder.selectUsed`), no todo el top-6 recuperado.
+- **Orden del contexto**: chunks críticos primero; el resto agrupado por `chunk_index`.
+
+### Preguntas compuestas
+- Límite de consulta **500 caracteres** (`MAX_QUERY_LENGTH`, backend y `shared.jsx`); antes 200 cortaba la segunda pregunta.
+- `utils/textProcessor.isCompoundQuestion()`: en preguntas con 2+ sub-preguntas, la regla B2 de `llmService` conserva la respuesta parcial y la nota "No encontré información sobre: X" en lugar de convertirla en un "sin información" total.
+
 ### Validación anti-alucinación
 - **`citationValidator.js`**: verifica que los artículos/documentos citados existan realmente en el corpus; recorta "ecos" de ejemplos del prompt cuando no aplican a la pregunta.
 - **`answerVerifier.js` / `polarityValidator.js`**: chequeo de premisa (la pregunta debe estar anclada en el contexto recuperado) y de polaridad (no invertir sentido afirmativo/negativo).
@@ -187,7 +199,7 @@ Si hay una pregunta/respuesta o un borrador de sugerencia en pantalla y nadie in
 | `OLLAMA_EMBED_MODEL` / `LOCAL_EMBEDDING_DIMENSION` | `bge-m3` / `1024` | Modelo de embeddings. |
 | `LLM_PROMPT_STYLE` / `OLLAMA_NUM_CTX` | `chat` / `8192` | Modo de prompting y ventana de contexto. |
 | `CACHE_READ_ENABLED` / `CACHE_WRITE_ENABLED` | `false` / `true` | SQLite solo audita, no responde (ver sección 4). |
-| `MAX_QUERY_LENGTH` | 200 | Límite de caracteres por consulta. |
+| `MAX_QUERY_LENGTH` | 500 | Límite de caracteres por consulta. |
 | `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` | 900000 / 100 | Rate limiting del backend. |
 | `ENABLE_NEURAL_RERANKER` | `false` | Cross-Encoder desactivado en producción. |
 | `ADMIN_PIN_HASH` / `ADMIN_PIN_SALT` | — | Credencial de acceso admin (server-side only). |
