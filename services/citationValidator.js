@@ -172,10 +172,23 @@ class CitationValidator {
         // el artículo 23"): la respuesta sale de ese artículo, no del ejemplo.
         if (/jornada|hora|semana|horario|turno|2101|reduccion|\bart(iculo|\.)/.test(q)) return { text, echoOnly: false };
         const CLAUSE = /,?\s*(de acuerdo con|conforme a|seg[uú]n|establecid[oa] por)\s+(la\s+)?(reducci[oó]n\s+establecida\s+por\s+(la\s+)?)?ley\s+2101(\s+de\s+2021)?(,?\s+vigente\s+a\s+partir\s+de(l)?\s+(a[nñ]o\s+)?2026)?/gi;
-        // Incluye "jornada laboral" a secas: en preguntas que no son de jornada,
-        // el modelo también comenta el ejemplo ("no se menciona específicamente
-        // la jornada laboral en el contexto de esta pregunta").
-        const ECHO_SENTENCE = /jornada\s+(laboral\s+)?semanal\s+(es|ser[aá])\s+de\s+42\s+horas|42\s+horas\s+semanales|ley\s+2101|\bjornada\s+laboral\b/i;
+        // (2026-10-15) BUG CORREGIDO: la alternativa `\bjornada\s+laboral\b` a
+        // secas detectaba el eco cuando el modelo COMENTABA el ejemplo ("no se
+        // menciona específicamente la jornada laboral..."), pero también
+        // coincidía con CUALQUIER oración real que usara esa frase común como
+        // calificador normal — ej. Art. 81 #31 del RIT: "no se permite el uso
+        // de celular... durante la jornada laboral, salvo autorización...".
+        // Esa frase es contenido legítimo (nada que ver con el ejemplo de 42
+        // horas/Ley 2101), pero se borraba igual, dejando <25 caracteres y
+        // disparando `echoOnly=true` → "No se encontró información suficiente"
+        // aunque la respuesta correcta sí estuviera en el contexto. Caso real:
+        // "¿puedo usar el celular en el área de TI?" (la query no contiene
+        // jornada/hora/semana/horario/turno/2101/reduccion/art, así que el
+        // guard de la línea de arriba no se activaba). Fix: solo tratar
+        // "jornada laboral" como eco cuando aparece en una frase de
+        // comentario/cobertura ("no se menciona/especifica/indica... jornada
+        // laboral"), no como calificador de una oración sustantiva.
+        const ECHO_SENTENCE = /jornada\s+(laboral\s+)?semanal\s+(es|ser[aá])\s+de\s+42\s+horas|42\s+horas\s+semanales|ley\s+2101|no\s+se\s+(menciona|especifica|indica|establece)[^.!?]{0,60}jornada\s+laboral/i;
         let removed = 0;
         let out = text.replace(CLAUSE, () => { removed++; return ''; });
         out = out.split(/(\n+)/).map(line => {
