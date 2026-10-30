@@ -1,4 +1,6 @@
 import DatabaseService from '../services/database.js';
+import faqCache from '../services/faqCache.js';
+import { normalizeQuestion } from '../services/answerKeys.js';
 import { logAnalyticsEvent } from '../utils/logger.js';
 
 /**
@@ -66,6 +68,18 @@ export const postRateAnswer = async (req, res) => {
 
         const id = await DatabaseService.saveRating({ rating, question, answer, sources, conversationId, clientIp: req.ip });
         logAnalyticsEvent('AnswerFeedback', { id, useful: rating === 'good', rating, query: question, sources, conversationId });
+        // "No sirvió" sobre un tema sugerido → la próxima consulta regenera la respuesta.
+        if (rating === 'bad' && faqCache.invalidate(question)) {
+            console.log(`[FaqCache] Entrada invalidada por calificación negativa: "${question}"`);
+        }
+        // "No sirvió" sobre una respuesta aprobada por RRHH → deja de servirse hasta que RRHH la revise.
+        if (rating === 'bad') {
+            const approved = await DatabaseService.findApproved(normalizeQuestion(question));
+            if (approved) {
+                await DatabaseService.setReviewStatus(approved.id, 'revisar', 'calificacion_negativa', 'suspender');
+                console.log(`[Aprobadas] Suspendida por calificación negativa: "${approved.question_original}"`);
+            }
+        }
 
         res.json({ success: true, id });
     } catch (error) {

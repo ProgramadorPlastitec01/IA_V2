@@ -686,8 +686,17 @@ class RagService {
             let usedSourcesFinal = null; // fuentes que realmente respaldan la respuesta
 
             try {
-                const { jsonFacts, citations, usedSources } = await llmService.generateRAGResponse(query, contextText, session, confidence, sources, [...interpretation_hints, ...(extraHints || [])], sourceTexts);
+                const { jsonFacts, citations, usedSources, llmTiming } = await llmService.generateRAGResponse(query, contextText, session, confidence, sources, [...interpretation_hints, ...(extraHints || [])], sourceTexts);
                 if (usedSources && usedSources.length > 0) usedSourcesFinal = usedSources;
+                // Desglose del tiempo del LLM (2026-10-29): casi todo es leer el prompt
+                // en la GPU del servidor; ver "Latencia" en DOCUMENTACION_TECNICA.md.
+                if (llmTiming) {
+                    metrics.llm_prompt_tokens = llmTiming.prompt_tokens;
+                    metrics.llm_prompt_ms     = llmTiming.prompt_ms;
+                    metrics.llm_gen_tokens    = llmTiming.gen_tokens;
+                    metrics.llm_gen_ms        = llmTiming.gen_ms;
+                }
+                metrics.context_chars = contextText.length;
                 let builtText = responseBuilderService.build(jsonFacts, responseType);
                 let finalCitations = citations;
 

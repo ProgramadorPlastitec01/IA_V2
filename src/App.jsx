@@ -1,5 +1,6 @@
 import KioskApp from './components/kiosk/KioskApp'
 import AnalyticsDashboard from './components/AnalyticsDashboard'
+import HrPortal from './components/admin/HrPortal'
 import './index.css'
 
 // La vista principal es KioskApp (rediseño 2026-10-09: pantalla de inicio +
@@ -12,6 +13,12 @@ function App() {
 
   if (isDashboard) {
     return <AnalyticsDashboard onClose={() => window.close()} />;
+  }
+
+  // Portal RRHH (respuestas aprobadas): se abre desde el modal de PIN con el
+  // PIN de RRHH; el servidor exige el token en cada llamada.
+  if (window.location.search.includes('rrhh=true')) {
+    return <HrPortal onClose={() => window.close()} />;
   }
 
   return <KioskApp />;

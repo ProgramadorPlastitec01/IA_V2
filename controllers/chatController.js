@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import DatabaseService from '../services/database.js';
 import PrivacyService, { CATEGORIES } from '../services/privacy.js';
 import ragService from '../services/ragService.js';
+import faqCache from '../services/faqCache.js';
+import { normalizeQuestion, corpusSignature } from '../services/answerKeys.js';
 import { cleanResponse, isCompoundQuestion } from '../utils/textProcessor.js';
 import { logAnalyticsEvent, logErrorEvent } from '../utils/logger.js';
 import { SYSTEM_MESSAGES } from '../config/systemMessages.js';
@@ -99,7 +101,9 @@ const stripFabricatedNote = (question, text) => {
 
 export const postQuery = async (req, res) => {
     const startTotal = Date.now();
-    const { query, conversationId, bypass_cache } = req.body || {};
+    const { query, conversationId, bypass_cache, faq } = req.body || {};
+    // Tema sugerido (chip / Preguntas Frecuentes): texto fijo → caché propia (services/faqCache.js)
+    const useFaqCache = faq === true && !bypass_cache;
     const stats = {
         sqlite_ms: 0,
         embedding_ms: 0,
@@ -146,6 +150,74 @@ export const postQuery = async (req, res) => {
                 rejected: true,
                 reason: 'injection_detected'
             });
+        }
+
+        // 1.7. Respuesta aprobada por RRHH (portal RRHH): misma pregunta normalizada,
+        //      nunca por similitud. Si los documentos cambiaron desde la aprobación,
+        //      vuelve a "revisar" y la consulta sigue por el RAG.
+        const questionKey = normalizeQuestion(query);
+        if (!bypass_cache) {
+            try {
+                const approved = await DatabaseService.findApproved(questionKey);
+                if (approved && approved.signature !== corpusSignature()) {
+                    await DatabaseService.setReviewStatus(approved.id, 'revisar', 'documentos_cambiaron', 'suspender');
+                    console.log(`[Aprobadas] Documentos cambiaron → a revisar: "${approved.question_original}"`);
+                } else if (approved) {
+                    await DatabaseService.markServed(approved.id);
+                    stats.total_ms = Date.now() - startTotal;
+                    const approvedConversationId = conversationId || crypto.randomUUID();
+                    let approvedSources = [];
+                    try { approvedSources = JSON.parse(approved.approved_sources || '[]'); } catch { /* sin fuentes */ }
+                    logAnalyticsEvent('RAGQueryMetrics', {
+                        conversationId: approvedConversationId,
+                        clientIp: req.ip,
+                        query,
+                        response: approved.approved_answer,
+                        category: CATEGORIES.REGLAMENTO,
+                        ...stats,
+                        cache: 'aprobada',
+                    });
+                    return res.json({
+                        response: approved.approved_answer,
+                        outOfScope: false,
+                        category: CATEGORIES.REGLAMENTO,
+                        sources: approvedSources,
+                        cached: true,
+                        cacheSource: 'aprobada',
+                        conversationId: approvedConversationId,
+                    });
+                }
+            } catch (e) {
+                console.error('⚠️ Error respuestas aprobadas:', e.message);
+            }
+        }
+
+        // 1.8. Tema sugerido con respuesta vigente en caché (~1 s en vez de 40-60 s)
+        if (useFaqCache) {
+            const hit = faqCache.get(query);
+            if (hit) {
+                stats.total_ms = Date.now() - startTotal;
+                const faqConversationId = conversationId || crypto.randomUUID();
+                // Se registra como consulta normal para que cuente en analítica y latencia.
+                logAnalyticsEvent('RAGQueryMetrics', {
+                    conversationId: faqConversationId,
+                    clientIp: req.ip,
+                    query,
+                    response: hit.text,
+                    category: CATEGORIES.REGLAMENTO,
+                    ...stats,
+                    cache: 'faq',
+                });
+                return res.json({
+                    response: hit.text,
+                    outOfScope: false,
+                    category: CATEGORIES.REGLAMENTO,
+                    sources: hit.sources || [],
+                    cached: true,
+                    cacheSource: 'faq',
+                    conversationId: faqConversationId,
+                });
+            }
         }
 
         // 2. Búsqueda en Caché SQLite (solo si CACHE_READ_ENABLED)
@@ -240,6 +312,15 @@ export const postQuery = async (req, res) => {
             [`${SYSTEM_MESSAGES.UNSUPPORTED_PREMISE_PREFIX} «`, 'unsupported_premise'],
         ];
         const noAnswer = NO_ANSWER_REASONS.find(([msg]) => finalResponseText && finalResponseText.trim().startsWith(msg));
+        const isReusableAnswer = !noAnswer && finalCategory === CATEGORIES.REGLAMENTO && isQualityAnswer(finalResponseText);
+        if (useFaqCache && isReusableAnswer) {
+            faqCache.set(query, { text: finalResponseText, sources: ragResult.sources || [] });
+        }
+        // Candidata para el portal RRHH: última respuesta de la IA por pregunta.
+        if (!bypass_cache && isReusableAnswer) {
+            DatabaseService.recordGeneratedAnswer(query.trim(), questionKey, finalResponseText, ragResult.sources || [])
+                .catch(e => console.error('⚠️ Error registrando respuesta para revisión:', e.message));
+        }
         if (noAnswer) {
             logAnalyticsEvent('UnansweredQuery', {
                 conversationId: finalConversationId,

@@ -1,46 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
-import { API_BASE_URL } from '../../utils/apiConfig';
+import { useState } from 'react';
 import { ViewTopBar, HandsHelpingIcon, SearchIcon, FileAltIcon, CheckIcon } from './shared.jsx';
+import { useDocuments } from './useDocuments.js';
+import DocMeta from './DocMeta.jsx';
 
 /**
  * DocumentsView — "Documentos Disponibles" (rediseño 2026-10-09).
- * Lista en vivo desde /api/documents (mismo endpoint que ya usaba el modal
- * DocumentsGuide): deriva los nombres amigables de lo realmente indexado en
- * Qdrant, para no desactualizarse si cambia la base documental.
+ * Lista en vivo desde /api/documents (código, versión y fecha de cada uno):
+ * deriva lo mostrado de lo realmente indexado en Qdrant y de la tabla de
+ * control de cada .md, para no desactualizarse si cambia la base documental.
  */
 const DocumentsView = ({ onHome, onNavigate }) => {
-    const [documents, setDocuments] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [errored, setErrored] = useState(false);
+    const { documents, loading, errored } = useDocuments();
     const [query, setQuery] = useState('');
-    // Ref (no state) para "ya se hizo el fetch": con StrictMode, React
-    // monta → desmonta → vuelve a montar el efecto en desarrollo. Si el
-    // fetch arranca de forma síncrona en el primer montaje, su cleanup
-    // marca `cancelled=true` ANTES de que la respuesta llegue, y el segundo
-    // montaje nunca reintenta (hasFetchedRef ya quedó en true) — la vista
-    // se queda en "Cargando..." para siempre. Diferir el arranque a un
-    // microtask dentro de la propia promesa dencadena ambos montajes
-    // (mount→cleanup→mount) antes de que el primero decida iniciar el
-    // fetch, así que solo el montaje que sobrevive llega a ejecutarlo.
-    // Mismo patrón que DocumentsGuide.jsx (modal previo a este rediseño).
-    const hasFetchedRef = useRef(false);
-
-    useEffect(() => {
-        if (hasFetchedRef.current) return;
-        let cancelled = false;
-        Promise.resolve().then(() => {
-            if (cancelled) return;
-            hasFetchedRef.current = true;
-            fetch(`${API_BASE_URL}/api/documents`)
-                .then(r => r.json())
-                .then(data => { if (!cancelled) setDocuments(data.documents || []); })
-                .catch(() => { if (!cancelled) setErrored(true); })
-                .finally(() => { if (!cancelled) setLoading(false); });
-        });
-        return () => { cancelled = true; };
-    }, []);
-
-    const filtered = documents.filter(name => name.toLowerCase().includes(query.toLowerCase()));
+    const q = query.toLowerCase();
+    const filtered = documents.filter(d =>
+        `${d.name} ${d.codigo || ''} ${d.version || ''}`.toLowerCase().includes(q));
 
     return (
         <section className="flex-1 flex flex-col h-full overflow-hidden bg-kiosk-bg">
@@ -78,16 +52,17 @@ const DocumentsView = ({ onHome, onNavigate }) => {
 
                 {!loading && !errored && filtered.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {filtered.map((name, i) => (
-                            <div key={i} className="bg-kiosk-card border border-kiosk-border hover:border-kiosk-accent/60 rounded-2xl p-5 flex flex-col justify-between transition-all shadow-sm">
+                        {filtered.map((doc) => (
+                            <div key={doc.name} className="bg-kiosk-card border border-kiosk-border hover:border-kiosk-accent/60 rounded-2xl p-5 flex flex-col justify-between transition-all shadow-sm">
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1 rounded-full border border-blue-100">Documento Oficial</span>
                                     </div>
                                     <h4 className="font-bold text-kiosk-text text-base flex items-start gap-2">
                                         <span className="text-blue-500 shrink-0 mt-0.5"><FileAltIcon size={18} /></span>
-                                        <span>{name}</span>
+                                        <span>{doc.name}</span>
                                     </h4>
+                                    <DocMeta doc={doc} className="pl-7" />
                                 </div>
                                 <div className="mt-4 pt-3 border-t border-kiosk-border flex items-center justify-between text-xs">
                                     <span className="text-kiosk-muted">Consultado por el Asistente IA</span>

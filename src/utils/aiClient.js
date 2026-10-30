@@ -115,7 +115,9 @@ class AIClient {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     query: sanitizedQuery,
-                    conversationId: this.conversationId
+                    conversationId: this.conversationId,
+                    // Tema sugerido (texto fijo): el backend puede responder desde su caché.
+                    ...(options?.faq ? { faq: true } : {}),
                 }),
                 signal
             });

@@ -23,6 +23,7 @@ import systemRoutes from './routes/systemRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import modelBenchmarkRoutes from './routes/modelBenchmarkRoutes.js';
 import corpusGapsRoutes from './routes/corpusGapsRoutes.js';
+import answerReviewRoutes from './routes/answerReviewRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -77,6 +78,7 @@ app.use('/api', systemRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api', modelBenchmarkRoutes);
 app.use('/api', corpusGapsRoutes);
+app.use('/api', answerReviewRoutes); // Portal RRHH (requiere token de rol rrhh)
 
 // --- SPA FALLBACK ---
 app.get(/\/AsistenteRRHH($|\/.*)/, (req, res, next) => {

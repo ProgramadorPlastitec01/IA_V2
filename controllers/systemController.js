@@ -4,6 +4,7 @@ import os from 'os';
 import DatabaseService from '../services/database.js';
 import qdrantService from '../services/qdrantService.js';
 import citationBuilder from '../services/citationBuilder.js';
+import { getDocumentMetadata } from '../services/documentMetadata.js';
 
 const LOG_FILE = path.join(process.cwd(), 'analytics.jsonl');
 const ERRORS_FILE = path.join(process.cwd(), 'errors.jsonl');
@@ -92,12 +93,14 @@ export const getSystemStatus = async (req, res) => {
 export const getDocuments = async (req, res) => {
     try {
         const sources = await qdrantService.listDistinctSources();
-        const names = new Set();
+        const byName = new Map();
         sources.forEach(src => {
             const name = citationBuilder._displayName(src);
-            if (name) names.add(name);
+            if (name && !byName.has(name)) byName.set(name, { name, ...getDocumentMetadata(src) });
         });
-        res.json({ documents: Array.from(names).sort((a, b) => a.localeCompare(b, 'es')) });
+        const details = Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+        // `documents` (solo nombres) se mantiene para DocumentsGuide; `details` trae código/versión/fecha.
+        res.json({ documents: details.map(d => d.name), details });
     } catch (e) {
         res.status(503).json({ documents: [], error: 'No se pudo consultar la base documental.' });
     }

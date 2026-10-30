@@ -9,8 +9,9 @@ import {
     MicIcon, StopIcon, SendIcon, SpeakerIcon, CopyIcon,
     ViewTopBar, copyToClipboard, CAT, ICONS,
     CheckCircleIcon, ExclamationTriangleIcon, BanIcon, TimesIcon, PaperclipIcon,
-    CheckIcon, FrownIcon, MehIcon, SmileIcon, RedoAltIcon,
+    CheckIcon, FrownIcon, MehIcon, SmileIcon, RedoAltIcon, FileAltIcon,
 } from './shared.jsx';
+import DocumentsModal from './DocumentsModal.jsx';
 
 /**
  * ChatView — "Pregúntale a la IA" (rediseño 2026-10-09, kiosco tema claro).
@@ -30,6 +31,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
     const [systemError, setSystemError] = useState(null); // falla de red/backend al consultar → tarjeta grande
     const [toastError, setToastError] = useState(null);    // mic/copiar/voz → aviso flotante, no oculta contenido
     const [isSupported, setIsSupported] = useState(true);
+    const [docsOpen, setDocsOpen] = useState(false); // popup "Documentos" (código/versión/fecha)
 
     const volume = useMotionValue(0);
 
@@ -151,7 +153,8 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
     };
 
     // ── Consulta (texto o voz) ────────────────────────────────────────────
-    const handleQuery = useCallback(async (rawQueryText) => {
+    // `fromFaq`: chip o Preguntas Frecuentes (texto fijo) → el backend puede usar su caché.
+    const handleQuery = useCallback(async (rawQueryText, { fromFaq = false } = {}) => {
         const queryText = (rawQueryText || '').slice(0, MAX_QUERY_LENGTH).trim();
         if (!queryText || queryText.length < 2) return;
         if (isLocked.current) return;
@@ -173,7 +176,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
 
         try {
             abortControllerRef.current = new AbortController();
-            const result = await aiClient.query(queryText, { signal: abortControllerRef.current.signal });
+            const result = await aiClient.query(queryText, { signal: abortControllerRef.current.signal, faq: fromFaq });
             if (!mountedRef.current) return;
 
             let finalResult = (result || '').trim();
@@ -207,7 +210,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
     useEffect(() => {
         if (autoQuery && autoQuery !== consumedAutoQuery.current) {
             consumedAutoQuery.current = autoQuery;
-            handleQuery(autoQuery);
+            handleQuery(autoQuery, { fromFaq: true });
             onAutoQueryConsumed?.();
         }
     }, [autoQuery, handleQuery, onAutoQueryConsumed]);
@@ -380,8 +383,21 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
             <ViewTopBar
                 title="RITA"
                 onHome={onHome}
-                action={<span className="text-xs text-kiosk-muted hidden sm:inline w-24 text-right">Una respuesta a la vez</span>}
+                action={
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs text-kiosk-muted hidden lg:inline whitespace-nowrap">Una respuesta a la vez</span>
+                        <button
+                            onClick={() => setDocsOpen(true)}
+                            className="bg-blue-50 hover:bg-blue-100 text-kiosk-accent px-3 py-1.5 rounded-xl border border-blue-200 text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition-colors"
+                        >
+                            <FileAltIcon size={14} /><span>Documentos</span>
+                        </button>
+                    </div>
+                }
             />
+            <AnimatePresence>
+                {docsOpen && <DocumentsModal onClose={() => setDocsOpen(false)} />}
+            </AnimatePresence>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
                 <div className="w-full max-w-3xl flex flex-col gap-6">
@@ -405,7 +421,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
                                     return (
                                         <button
                                             key={i}
-                                            onClick={() => handleQuery(faq.q)}
+                                            onClick={() => handleQuery(faq.q, { fromFaq: true })}
                                             className="bg-kiosk-panel hover:bg-kiosk-card-hover border border-kiosk-border text-kiosk-muted hover:text-kiosk-text px-4 py-2.5 rounded-xl text-xs md:text-sm transition-all flex items-center space-x-2 shadow-sm"
                                         >
                                             <svg width="14" height="14" fill="none" stroke={c.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">{ICONS[faq.icon]}</svg>

@@ -19,7 +19,8 @@ import { open } from 'sqlite';
 import path from 'path';
 import { diceCoefficient } from 'dice-coefficient';
 
-const DB_PATH = path.join(process.cwd(), 'hr_cache.db');
+// HR_CACHE_DB permite apuntar una instancia de prueba a otra base (no tocar la de producción).
+const DB_PATH = process.env.HR_CACHE_DB || path.join(process.cwd(), 'hr_cache.db');
 const MAX_RECORDS = 10000;
 const SIMILARITY_THRESHOLD = 0.85;
 
@@ -146,6 +147,49 @@ class DatabaseService {
                 )
             `);
             await this.db.exec(`CREATE INDEX IF NOT EXISTS idx_benchmarks_created ON model_benchmarks(created_at)`);
+
+            // ── Respuestas aprobadas por RRHH (portal RRHH 2026-10-29) ──
+            // Una fila por pregunta normalizada (coincidencia EXACTA, sin similitud).
+            // latest_* = última respuesta generada por la IA; approved_* = texto que
+            // RRHH aprobó (o corrigió) y que se sirve sin pasar por el LLM mientras
+            // status = 'aprobada' y la firma de los documentos no cambie.
+            await this.db.exec(`
+                CREATE TABLE IF NOT EXISTS answer_reviews (
+                    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                    question_key      TEXT    NOT NULL,
+                    question_original TEXT    NOT NULL,
+                    latest_answer     TEXT    DEFAULT NULL,
+                    latest_sources    TEXT    DEFAULT NULL,
+                    ask_count         INTEGER DEFAULT 0,
+                    last_asked        DATETIME DEFAULT NULL,
+                    approved_answer   TEXT    DEFAULT NULL,
+                    approved_sources  TEXT    DEFAULT NULL,
+                    edited            INTEGER DEFAULT 0,
+                    signature         TEXT    DEFAULT NULL,
+                    approved_at       DATETIME DEFAULT NULL,
+                    served_count      INTEGER DEFAULT 0,
+                    last_served       DATETIME DEFAULT NULL,
+                    status            TEXT    DEFAULT 'pendiente',
+                    status_reason     TEXT    DEFAULT NULL,
+                    note              TEXT    DEFAULT NULL,
+                    created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            await this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_key ON answer_reviews(question_key)`);
+            await this.db.exec(`CREATE INDEX IF NOT EXISTS idx_reviews_status ON answer_reviews(status)`);
+            await this.db.exec(`
+                CREATE TABLE IF NOT EXISTS answer_review_history (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    review_id     INTEGER NOT NULL,
+                    action        TEXT    NOT NULL,
+                    answer_before TEXT    DEFAULT NULL,
+                    answer_after  TEXT    DEFAULT NULL,
+                    note          TEXT    DEFAULT NULL,
+                    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            await this.db.exec(`CREATE INDEX IF NOT EXISTS idx_review_history_review ON answer_review_history(review_id)`);
 
             console.log(`✅ SQLite Cache Database inicializada en: ${DB_PATH}`);
         } catch (error) {
@@ -543,6 +587,126 @@ class DatabaseService {
             totals,
             recent: recent.map(r => ({ ...r, sources: (() => { try { return JSON.parse(r.sources || '[]'); } catch { return []; } })() }))
         };
+    }
+
+    // ── Respuestas aprobadas por RRHH ───────────────────────────────────
+
+    /**
+     * Registra la última respuesta de calidad generada por la IA para una pregunta
+     * (crea la fila 'pendiente' si es nueva). No toca lo aprobado ni el estado.
+     */
+    async recordGeneratedAnswer(questionOriginal, questionKey, answer, sources = []) {
+        if (!this.db || !questionKey || !answer) return;
+        await this.db.run(
+            `INSERT INTO answer_reviews (question_key, question_original, latest_answer, latest_sources, ask_count, last_asked)
+             VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+             ON CONFLICT(question_key) DO UPDATE SET
+                 latest_answer  = excluded.latest_answer,
+                 latest_sources = excluded.latest_sources,
+                 ask_count      = ask_count + 1,
+                 last_asked     = CURRENT_TIMESTAMP`,
+            [questionKey, questionOriginal, answer, JSON.stringify(sources || [])]
+        );
+    }
+
+    async findApproved(questionKey) {
+        if (!this.db || !questionKey) return null;
+        return this.db.get(
+            `SELECT * FROM answer_reviews WHERE question_key = ? AND status = 'aprobada' LIMIT 1`,
+            [questionKey]
+        );
+    }
+
+    async getReview(id) {
+        if (!this.db) return null;
+        return this.db.get(`SELECT * FROM answer_reviews WHERE id = ?`, [id]);
+    }
+
+    /** Pregunta respondida con la respuesta aprobada: cuenta como pregunta y como uso. */
+    async markServed(id) {
+        if (!this.db) return;
+        await this.db.run(
+            `UPDATE answer_reviews
+             SET served_count = served_count + 1, last_served = CURRENT_TIMESTAMP,
+                 ask_count = ask_count + 1, last_asked = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [id]
+        );
+    }
+
+    async _addReviewHistory(reviewId, action, answerBefore = null, answerAfter = null, note = null) {
+        await this.db.run(
+            `INSERT INTO answer_review_history (review_id, action, answer_before, answer_after, note)
+             VALUES (?, ?, ?, ?, ?)`,
+            [reviewId, action, answerBefore, answerAfter, note]
+        );
+    }
+
+    /** Cambia el estado (revisar / pendiente / …) y deja constancia en el historial. */
+    async setReviewStatus(id, status, reason, action, note = null) {
+        if (!this.db) return;
+        await this.db.run(
+            `UPDATE answer_reviews SET status = ?, status_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [status, reason, id]
+        );
+        await this._addReviewHistory(id, action, null, null, note || reason);
+    }
+
+    /**
+     * @param {number} id
+     * @param {{answer:string, sources:string[], edited:boolean, signature:string, note?:string|null}} a
+     */
+    async approveReview(id, { answer, sources, edited, signature, note = null }) {
+        if (!this.db) throw new Error('DB no inicializada');
+        const before = await this.getReview(id);
+        await this.db.run(
+            `UPDATE answer_reviews
+             SET approved_answer = ?, approved_sources = ?, edited = ?, signature = ?,
+                 approved_at = CURRENT_TIMESTAMP, status = 'aprobada', status_reason = NULL,
+                 note = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [answer, JSON.stringify(sources || []), edited ? 1 : 0, signature, note, id]
+        );
+        await this._addReviewHistory(id, edited ? 'corregir' : 'aprobar',
+            before?.latest_answer || null, answer, note);
+    }
+
+    async rejectReview(id, note = null) {
+        if (!this.db) throw new Error('DB no inicializada');
+        await this.db.run(
+            `UPDATE answer_reviews SET status = 'rechazada', status_reason = NULL, note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [note, id]
+        );
+        await this._addReviewHistory(id, 'rechazar', null, null, note);
+    }
+
+    async listReviews(status, limit = 200) {
+        if (!this.db) return [];
+        return this.db.all(
+            `SELECT * FROM answer_reviews WHERE status = ?
+             ORDER BY ask_count DESC, last_asked DESC LIMIT ?`,
+            [status, limit]
+        );
+    }
+
+    async countReviewsByStatus() {
+        if (!this.db) return [];
+        return this.db.all(`SELECT status, COUNT(*) as count FROM answer_reviews GROUP BY status`);
+    }
+
+    async getReviewHistory(id) {
+        if (!this.db) return [];
+        return this.db.all(
+            `SELECT action, answer_before, answer_after, note, created_at
+             FROM answer_review_history WHERE review_id = ? ORDER BY id DESC`,
+            [id]
+        );
+    }
+
+    /** Conteo de calificaciones por pregunta tal como se escribió (el llamador normaliza). */
+    async getRatingCountsByQuestion() {
+        if (!this.db) return [];
+        return this.db.all(`SELECT question, rating, COUNT(*) as count FROM answer_ratings GROUP BY question, rating`);
     }
 
     // ── Validación de Modelos IA (banco de pruebas) ─────────────────────

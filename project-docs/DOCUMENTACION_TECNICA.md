@@ -20,7 +20,7 @@ Patrón **Cliente-Servidor (SPA + API REST)** con un pipeline RAG híbrido de 5 
 - **Backend**: API REST (Node.js + Express 5) que orquesta retrieval, reranking, generación y validación de citas.
 - **Vector DB**: Qdrant — búsqueda híbrida (BM25 + semántica) sobre el corpus documental.
 - **LLM**: Ollama (modelo local, sin llamadas a APIs externas de IA generativa).
-- **Caché SQLite**: solo auditoría/analítica (no sirve respuestas) — ver sección 4.
+- **SQLite**: auditoría/analítica (`knowledge_base`, no sirve respuestas) y respuestas aprobadas por RRHH (`answer_reviews`, sí se sirven, coincidencia exacta) — ver sección 4.
 
 ---
 
@@ -79,8 +79,10 @@ graph TD
 | `GET` | `/api/health` | Estado del servidor (`ready` / `initializing`) y motor activo. |
 | `GET` | `/api/system-status` | Métricas de sistema (uptime, memoria, plataforma). |
 | `GET` | `/api/knowledge-version` | Versión actual del corpus indexado. |
-| `GET` | `/api/documents` | Lista de documentos disponibles en el corpus. |
-| `POST` | `/api/verify-pin` | Valida el PIN de administrador (hash+salt, server-side). |
+| `GET` | `/api/documents` | Documentos del corpus: `documents` (nombres) y `details` (nombre, código, versión, fecha o "vigente desde" del RIT), leídos de la tabla de control de cada `.md` de `docs/` (`services/documentMetadata.js`). Al reemplazar un `.md` por una versión nueva, la vista se actualiza sola. |
+| `POST` | `/api/verify-pin` | Valida el PIN (hash+salt, server-side). PIN de TI → `{role:'admin'}` (Admin Dashboard). PIN de RRHH → `{role:'rrhh', token}` (portal de respuestas aprobadas). |
+| `GET` | `/api/answer-reviews?status=` | Portal RRHH: preguntas reales con la última respuesta de la IA, conteo por estado y calificaciones. **Exige `Authorization: Bearer <token rrhh>`** (401 sin él). |
+| `POST` | `/api/answer-reviews/:id/approve` \| `reject` \| `revoke` | Portal RRHH: aprobar (opcionalmente con el cuerpo corregido), rechazar o revocar. Mismo token. `GET /api/answer-reviews/:id/history` da el historial. |
 | `POST` | `/api/bump-knowledge-version` | Fuerza una nueva versión de conocimiento (admin). |
 | `POST`/`GET` | `/api/analytics`, `/api/analytics/quality` | Registro y reporte de calidad de respuestas. |
 | `GET`/`POST` | `/api/system-errors`, `/api/system-errors/resolve` | Errores reportados por el frontend. |
@@ -91,9 +93,13 @@ graph TD
 ### Flujo de `/api/query` (`chatController.js`)
 1. **Filtro de inyección de prompt**: blocklist de patrones (`ignora tus instrucciones`, `jailbreak`, etc.) — rechazo inmediato sin tocar el LLM.
 2. **Filtro de privacidad** (`privacy.js`): reglas contextuales (no solo keywords) para detectar solicitudes de información sensible/PII.
-3. **Delegación a `ragService.query()`** — ejecuta el pipeline de 5 capas descrito arriba.
-4. **Registro en SQLite** (si `CACHE_WRITE_ENABLED=true`): guarda pregunta, respuesta, confianza e IP — **solo para auditoría**, nunca se vuelve a leer para responder.
-5. **Respuesta al frontend**: texto + fuentes citadas + metadatos de retrieval (score, tipo de búsqueda, boost aplicado).
+3. **Respuesta aprobada por RRHH**: si la pregunta normalizada coincide **exactamente** con una aprobada en `answer_reviews` y los documentos no cambiaron, se devuelve sin pasar por el LLM (`cacheSource:'aprobada'`). Ver sección 4, "Respuestas aprobadas por RRHH".
+4. **Tema sugerido** (`faq: true`): si hay respuesta vigente en `faqCache`, se devuelve sin pasar por el LLM (ver sección 5, "Caché de temas sugeridos").
+5. **Delegación a `ragService.query()`** — ejecuta el pipeline de 5 capas descrito arriba.
+6. **Registro en SQLite**:
+   - si `CACHE_WRITE_ENABLED=true`, guarda pregunta, respuesta, confianza e IP en `knowledge_base`, **solo para auditoría**; nunca se vuelve a leer para responder;
+   - toda respuesta de calidad actualiza además `answer_reviews` como candidata para el portal RRHH.
+7. **Respuesta al frontend**: texto + fuentes citadas + metadatos de retrieval (score, tipo de búsqueda, boost aplicado).
 
 ---
 
@@ -115,6 +121,29 @@ Desde 2026-08-14 la lectura y escritura son flags **independientes**:
 
 ### Otras tablas
 - **Sugerencias** (buzón) y **Feedback de respuestas** (rating 😞/😐/😊), consumidas por `feedbackController`/`feedbackRoutes`.
+
+### Respuestas aprobadas por RRHH (`answer_reviews`, 2026-10-29)
+Objetivo: responder en menos de 1 s las preguntas repetidas, con un texto que una persona de RRHH validó, sin reactivar la búsqueda por similitud.
+
+- **Coincidencia exacta.** La clave es la pregunta normalizada (`services/answerKeys.js` → `normalizeQuestion`: minúsculas, sin tildes ni signos). "Permiso por luto" nunca recibe la respuesta de "permiso por matrimonio". `findSimilar` (Dice) sigue apagado.
+- **Candidatas.** Cada respuesta de calidad del RAG (sin `bypass_cache`) actualiza `latest_answer`/`latest_sources` y suma `ask_count`. El portal lista primero las más preguntadas.
+- **Estados.**
+  - `pendiente` → `aprobada` o `rechazada`.
+  - `aprobada` → `revisar` en dos casos:
+    - cambió la firma documental (`documentos_cambiaron`);
+    - un trabajador marcó "No sirvió" (`calificacion_negativa`).
+  - Revocar devuelve la pregunta a `pendiente`.
+  - Mientras no esté `aprobada`, la pregunta pasa por el RAG.
+- **Corrección.** RRHH edita solo el cuerpo (máx. 3.000 caracteres). El servidor vuelve a unir el bloque de fuentes original (corte en el último `\n\n---\n`, igual que `splitAnswer` del kiosco), así las fuentes no se pueden romper ni inventar. Se marca `edited=1`.
+- **Firma.** `corpusSignature()` = `knowledge_version.json` + hash del **contenido** de los archivos del corpus. No incluye la colección de Qdrant ni el prompt: reindexar no manda todo a revisión; reemplazar un `.md` sí.
+- **Historial.** `answer_review_history` registra aprobar / corregir / rechazar / revocar / suspender, con el texto antes y después y la nota.
+- **Acceso.**
+  - Se entra con el PIN de RRHH (`HR_PIN_HASH`/`HR_PIN_SALT`, generar con `node scripts/hash-pin.mjs <PIN> HR`) en el mismo modal de PIN del kiosco. Eso abre `/?rrhh=true`.
+  - El servidor emite un token HMAC (8 h; un reinicio del backend lo invalida) y **lo valida en cada llamada** (`requireHr`, `utils/security.js`).
+  - Sin `HR_PIN_HASH`, el portal queda deshabilitado.
+- **Pruebas.** `HR_CACHE_DB` apunta una instancia de prueba a otra base, para no tocar `hr_cache.db` de producción.
+
+> **Pendiente de seguridad:** los endpoints del Admin Dashboard de TI (`/bump-knowledge-version`, `/model-benchmark/*`, `/glosario/add-term`, `/system-errors/resolve*`) no validan el PIN en el servidor. El PIN solo protege la pantalla y `/?dashboard=true` abre el dashboard directamente. Se recomienda protegerlos con el mismo esquema de token.
 
 ---
 
@@ -146,6 +175,20 @@ Desde 2026-08-14 la lectura y escritura son flags **independientes**:
 - **Pistas de procedimiento** (`_procedureHint`): para "salida" o "procedimiento completo" se instruye al LLM a enumerar todos los pasos.
 - **Fuentes citadas**: solo los documentos que respaldan la respuesta (`citationBuilder.selectUsed`), no todo el top-6 recuperado.
 - **Orden del contexto**: chunks críticos primero; el resto agrupado por `chunk_index`.
+- **Tope fijo de 10.000 caracteres.** Se probó bajarlo a 6.000 en preguntas puntuales (2026-10-29): la mediana bajó de 41 s a 28 s, pero se perdieron respuestas correctas. Desaparecieron el horario vigente del Art. 23 y la duración del contrato de aprendizaje (Art. 10), y "factores de riesgo" quedó sin respuesta. Proteger los críticos arreglaba el horario, pero anulaba la ganancia. Se descartó: no recortar el contexto sin una regresión que lo respalde.
+
+### Latencia (diagnóstico 2026-10-29)
+- El tiempo está casi todo en **leer el prompt** (prefill) en la GPU **NVIDIA T1000 8 GB (50 W, sin tensor cores)**: ~80–180 tokens/s, unos 10 ms por token. Retrieval ≈ 0,5–2 s y escribir la respuesta ≈ 3–5 s (~22 tokens/s).
+- La GPU llega a 83 °C y baja de 1815 a 1395 MHz (throttling térmico). Mejorar la ventilación recupera ~15–20 %. La solución de fondo es una GPU con tensor cores.
+- **Caché de prefijo de Ollama**: las instrucciones fijas (`RAG_SYSTEM_PROMPT` en `llmService.js`, ~1.800 tokens) van primero y no cambian, así que Ollama no las relee entre consultas. `warmUp()` las precarga al arrancar. Cualquier cambio a ese texto invalida la caché en la primera consulta.
+- `keepAlive()` (cada 4 min) mantiene cargados `qwen2.5` y `bge-m3`.
+- `RAGQueryMetrics` (analytics.jsonl) registra `llm_prompt_tokens`/`llm_prompt_ms` (tokens del prompt realmente evaluados, sin el prefijo en caché), `llm_gen_tokens`/`llm_gen_ms` y `context_chars`.
+
+### Caché de temas sugeridos (`services/faqCache.js`)
+- Solo para consultas marcadas `faq: true` por el frontend: chips del chat y vista "Preguntas Frecuentes". Las preguntas escritas siempre pasan por el RAG.
+- Se guarda en `faq_cache.json` (raíz; `FAQ_CACHE_FILE` para otra ruta), no en SQLite. Una entrada vale mientras no cambien la colección de Qdrant, `knowledge_version.json` o los archivos del corpus (mtime/tamaño); subir `FAQ_CACHE_VERSION` si cambia el prompt o el pipeline.
+- La primera consulta de cada tema tarda lo normal; las siguientes responden en ~1 s. Una calificación "No sirvió" borra la entrada y fuerza regenerarla.
+- Los aciertos se registran como `RAGQueryMetrics` con `cache: "faq"`.
 
 ### Preguntas compuestas
 - Límite de consulta **500 caracteres** (`MAX_QUERY_LENGTH`, backend y `shared.jsx`); antes 200 cortaba la segunda pregunta.

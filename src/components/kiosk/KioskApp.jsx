@@ -297,7 +297,10 @@ const KioskApp = () => {
                                 try {
                                     const res = await fetch(`${API_BASE_URL}/api/verify-pin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
                                     const data = await res.json();
-                                    if (data.success) { window.open('/?dashboard=true', '_blank'); setShowPinModal(false); }
+                                    // PIN de RRHH → portal de respuestas aprobadas; el token va en el
+                                    // fragmento (#), que el navegador no envía al servidor.
+                                    if (data.success && data.role === 'rrhh' && data.token) { window.open(`${window.location.pathname}?rrhh=true#t=${encodeURIComponent(data.token)}`, '_blank'); setShowPinModal(false); }
+                                    else if (data.success) { window.open('/?dashboard=true', '_blank'); setShowPinModal(false); }
                                     else { alert('PIN incorrecto.'); e.target.pin.value = ''; }
                                 } catch (err) { console.error(err); alert('Error de conexión con el servidor.'); }
                             }}>
