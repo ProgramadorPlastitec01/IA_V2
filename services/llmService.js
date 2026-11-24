@@ -22,7 +22,7 @@ import answerVerifier from './answerVerifier.js';
 import citationBuilder from './citationBuilder.js';
 import ragLogger from './ragLogger.js';
 import { runOnOllama } from '../utils/ollamaGate.js';
-import { isCompoundQuestion } from '../utils/textProcessor.js';
+import { isCompoundQuestion, splitCompoundQuestion } from '../utils/textProcessor.js';
 import { sentencePrefixKey } from '../utils/sentenceKey.js';
 
 dotenv.config();
@@ -422,7 +422,7 @@ Si hay una INTERPRETACIÓN DE LA PREGUNTA que la relaciona con un tema del CONTE
      * Etapa 2: Generación guiada por Evidencia
      * Etapa 3: Validadores post-generación
      */
-    async generateRAGResponse(question, context, session = null, retrievalConfidence = 0, sources = [], interpretationHints = [], sourceTexts = null) {
+    async generateRAGResponse(question, context, session = null, retrievalConfidence = 0, sources = [], interpretationHints = [], sourceTexts = null, opts = {}) {
         this._log('info', 'Iniciando Pipeline Tri-Estado (CoT XML)', { questionLen: question.length });
 
         // Notas de interpretación (2026-10-08, config/slangRules.js): qué
@@ -641,13 +641,17 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
         //      es lo más relevante que el modelo pudo decir. El resto no cubre la
         //      query → no eliminar, escalamos a NIF para devolver mensaje estándar.
         {
+            // (2026-11-24) La frase termina en ".", "?" o salto de línea. Con [^.]*
+            // la nota "No encontré información sobre: ¿Qué área…?" seguía hasta el
+            // primer punto y se tragaba el párrafo siguiente con la respuesta real
+            // ("Sin embargo, el incumplimiento… falta grave… justa causa.").
             const FRASES_RE = [
-                /\s*no\s+encontr[ée]\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.]*\.?/gi,
-                /\s*no\s+hay\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.]*\.?/gi,
-                /\s*no\s+se\s+encontr[oó]\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.]*\.?/gi,
-                /\s*no\s+existe[n]?\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.]*\.?/gi,
-                /\s*no\s+tengo\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.]*\.?/gi,
-                /\s*sin\s+embargo[,\s]+no\s+(?:encontr[ée]|hay)\s+informaci[oó]n[^.]*\.?/gi,
+                /\s*no\s+encontr[ée]\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.?\n]*[.?]?/gi,
+                /\s*no\s+hay\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.?\n]*[.?]?/gi,
+                /\s*no\s+se\s+encontr[oó]\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.?\n]*[.?]?/gi,
+                /\s*no\s+existe[n]?\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.?\n]*[.?]?/gi,
+                /\s*no\s+tengo\s+informaci[oó]n(?:\s+espec[ií]fica|\s+disponible|\s+adicional)?\s+sobre[^.?\n]*[.?]?/gi,
+                /\s*sin\s+embargo[,\s]+no\s+(?:encontr[ée]|hay)\s+informaci[oó]n[^.?\n]*[.?]?/gi,
             ];
 
             // Paso 1: recolectar texto de las frases ANTES de eliminarlas
@@ -689,7 +693,14 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
                     const compuesta = isCompoundQuestion(question);
                     const restoUtil = sinFrases.length >= 40;
 
-                    if (compuesta && restoUtil) {
+                    // (2026-11-24) Con isCompoundQuestion corregido ("y qué" ahora cuenta),
+                    // la nota se conserva solo si el resto NO cubre ya casi toda la
+                    // pregunta: "¿cómo define Diversidad y qué compromiso…?" respondida
+                    // completa (restoCov 0.7) traía una nota fabricada sobre el compromiso.
+                    // Una nota que CITA la sub-pregunta ("sobre: ¿Qué área…?", formato
+                    // que pide el prompt) es legítima aunque restoCov sea alto.
+                    const citaSubpregunta = /sobre:\s*¿/i.test(frasesMatchedText);
+                    if (compuesta && restoUtil && (restoCov < 0.6 || citaSubpregunta)) {
                         this._log('info', '[B2] Pregunta compuesta con contenido — se conserva respuesta parcial y nota', { frasesCov, restoCov });
                     } else if (frasesCov >= 0.5 && restoCov < 0.30 && !restoAnclado) {
                         // CASO B — frase legítima: el resto no responde la query
@@ -744,6 +755,24 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
         this._log('info', 'Clasificación Tri-Estado completada', { clasificacion });
 
         if (clasificacion === "NO_INFORMATION_FOUND") {
+            // ── Verificación por partes (2026-11-24) ─────────────────────────
+            // Pregunta compuesta + "sin información" total con buena confianza de
+            // retrieval: el modelo a veces declara que falta TODO porque falta una
+            // parte (prueba TI Sección 15: el texto de "falta grave… justa causa"
+            // estaba en el primer fragmento del contexto). Se pregunta cada parte
+            // por separado con el MISMO contexto (Ollama reutiliza el prefijo, solo
+            // cuesta la generación) y se responde lo que sí está documentado.
+            // Umbral 0.25 (el gate de ragService ya corta < 0.20): "recursos de la
+            // empresa… y con qué fines" tenía 0.31 con la Sección 11 en el contexto.
+            if (!opts.noSplit && retrievalConfidence >= 0.25) {
+                const subs = splitCompoundQuestion(question);
+                if (subs.length >= 2) {
+                    const partial = await this._answerSubQuestions(
+                        question, subs, context, session, retrievalConfidence, sources, interpretationHints, sourceTexts, llmTiming
+                    );
+                    if (partial) return partial;
+                }
+            }
             return {
                 jsonFacts: { error: "no_information_found" },
                 citations: "",
@@ -875,6 +904,65 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
         throw lastError;
     }
 
+    // ─── Verificación por partes de preguntas compuestas ───────────────────
+
+    /**
+     * Responde cada sub-pregunta por separado (sin volver a dividir) y combina
+     * las que tienen respuesta. Las que no, quedan como nota final
+     * "No encontré información sobre: …". Devuelve null si ninguna parte tiene
+     * respuesta (se mantiene el "sin información" original).
+     */
+    async _answerSubQuestions(question, subs, context, session, retrievalConfidence, sources, interpretationHints, sourceTexts, baseTiming) {
+        this._log('info', '[Partes] Pregunta compuesta sin información — verificando cada parte', { partes: subs.length });
+        const isRejectionText = (t) => !t || t.trim().length < 10
+            || /^(no encontr[ée] informaci[oó]n|no se pudo extraer|no se encontr[oó] informaci[oó]n|no tengo (la )?informaci[oó]n)/i.test(t.trim());
+        const firstQ = question.indexOf('¿');
+        const lead = firstQ > 0 ? question.slice(0, firstQ).trim() : '';
+        const core = (s) => (lead && s.startsWith(lead) ? s.slice(lead.length) : s).trim().replace(/^¿|\?$/g, '');
+
+        const answered = [];
+        const missing = [];
+        const timing = { ...(baseTiming || {}) };
+        for (const sub of subs) {
+            let r;
+            try {
+                r = await this.generateRAGResponse(sub, context, session, retrievalConfidence, sources, interpretationHints, sourceTexts, { noSplit: true });
+            } catch (e) {
+                this._log('error', '[Partes] Falló una sub-pregunta', { error: e.message });
+                r = null;
+            }
+            const ans = r?.jsonFacts?.answer;
+            // Una sub-respuesta puede traer su propia nota de faltante al final;
+            // se quita para no duplicarla con la nota combinada.
+            const body = ans
+                ? ans.replace(/\s*no encontr[ée] informaci[oó]n sobre:?[\s\S]*$/i, '').trim()
+                    // B2 puede dejarla en minúscula al quitar "Sin embargo, …"
+                    .replace(/^\p{Ll}/u, (l) => l.toUpperCase())
+                : '';
+            if (body && !isRejectionText(body)) answered.push(body);
+            else missing.push(core(sub));
+            if (r?.llmTiming) {
+                timing.gen_tokens = (timing.gen_tokens || 0) + (r.llmTiming.gen_tokens || 0);
+                timing.gen_ms     = (timing.gen_ms || 0) + (r.llmTiming.gen_ms || 0);
+            }
+        }
+        this._log('info', '[Partes] Resultado', { respondidas: answered.length, sinRespuesta: missing.length });
+        if (answered.length === 0) return null;
+
+        let respuesta = answered.join('\n\n');
+        if (missing.length > 0) {
+            respuesta += `\n\nNo encontré información sobre: ${missing.join('; ')}.`;
+        }
+        const usedSources = citationBuilder.selectUsed(respuesta, sourceTexts, sources);
+        const evidence = usedSources.filter(Boolean).map(s => ({ source: s }));
+        return {
+            jsonFacts: { answer: respuesta },
+            citations: citationBuilder.build(evidence, retrievalConfidence),
+            usedSources,
+            llmTiming: timing,
+        };
+    }
+
     // ─── Trim al último límite de oración ──────────────────────────────────
 
     /**
@@ -884,19 +972,34 @@ ${hintsBlock}PREGUNTA DEL EMPLEADO:
      */
     _trimToLastSentence(text) {
         const t = text.trim();
+        const DANGLING = /\s+\b(?:pero|y|o|ni|sino|aunque|porque|que|para|con|de|en|por|a|al|del)\s*$/i;
+        // (2026-11-24) Lista al final: los ítems no terminan en punto
+        // ("- **OEA** — Operador Económico Autorizado"), así que el último signo
+        // era el ":" del encabezado y se borraba la lista entera → el usuario
+        // veía "…los siguientes sistemas (LA/FT/FPADM):" (prueba TI Sección 3).
+        // Si la última línea es un ítem de lista, se conserva todo.
+        const lastLine = t.split('\n').map(l => l.trim()).filter(Boolean).pop() || '';
+        if (/^(?:[-*•]|\d+[.)])\s+\S/.test(lastLine)) {
+            return t.replace(DANGLING, '').replace(/[,;]\s*$/, '').trim();
+        }
+        // ":" ya no es límite de corte: cortar ahí siempre deja una introducción
+        // sin contenido ("…a través de:").
         const lastPunct = Math.max(
             t.lastIndexOf('.'),
             t.lastIndexOf('!'),
             t.lastIndexOf('?'),
-            t.lastIndexOf(':'),
         );
         // Solo cortar si hay un límite de oración razonablemente hacia el final (>30%)
         if (lastPunct > t.length * 0.30) {
             return t.substring(0, lastPunct + 1).trim();
         }
+        // Toda la respuesta es una introducción de lista ("…a través de:"): se deja
+        // con ":" para que la defensa final de ragService la convierta en
+        // "sin información" (con "…" pasaba como respuesta válida).
+        if (/:\s*$/.test(t)) return t;
         // Sin límite claro: eliminar la conjunción/preposición colgante y añadir "…"
         const stripped = t
-            .replace(/\s+\b(?:pero|y|o|ni|sino|aunque|porque|que|para|con|de|en|por|a|al|del)\s*$/i, '')
+            .replace(DANGLING, '')
             .replace(/[,;:]\s*$/, '')
             .trim();
         return (stripped || t) + '…';

@@ -86,8 +86,37 @@ export const reformulateQuery = (originalQuery) => {
  * respuesta parcial ni la nota "No encontré información sobre: X" de la
  * sub-pregunta que sí falta.
  */
+// Conector + interrogativo. El final usa (?!\p{L}) y no \b: en JS \b trata la
+// "é" como no-letra, así que "y qué consecuencia" NUNCA coincidía (2026-11-24,
+// pruebas TI Sección 15/Sección 5: la regla de compuestas no se activaba).
+// Admite una preposición antes del interrogativo: "y con qué fines", "y a quién",
+// "y en qué casos" (prueba TI "recursos de la empresa… y con qué fines…").
+const COMPOUND_CONNECTOR_RE = /(?<!\p{L})(?:y|adem[áa]s|tambi[ée]n|asimismo)\s+(?=(?:(?:con|a|en|para|de|por|desde|hasta|ante)\s+)?(?:qu[ée]|cu[áa]l(?:es)?|c[óo]mo|cu[áa]ndo|cu[áa]nt[oa]s?|d[óo]nde|qui[ée]n(?:es)?|por\s+qu[ée]|puedo|debo|tengo|hay)(?!\p{L}))/iu;
+
 export const isCompoundQuestion = (question) => {
     const q = String(question || '');
     if ((q.match(/\?/g) || []).length >= 2) return true;
-    return /\b(y|adem[áa]s|tambi[ée]n|asimismo)\s+(qu[ée]|cu[áa]l(es)?|c[óo]mo|cu[áa]ndo|cu[áa]nt[oa]s?|d[óo]nde|qui[ée]n(es)?|por\s+qu[ée]|puedo|debo|tengo|hay)\b/i.test(q);
+    return COMPOUND_CONNECTOR_RE.test(q);
+};
+
+/**
+ * Divide una pregunta compuesta en sub-preguntas autónomas (2026-11-24).
+ * Conserva la introducción previa al primer "¿" en cada parte, para que
+ * "Según la Sección 15 (…), ¿qué área…, y qué consecuencia…?" dé
+ * "Según la Sección 15 (…), ¿qué área…?" + "Según la Sección 15 (…), ¿qué consecuencia…?".
+ * Máximo 3 partes; devuelve [] si no hay al menos 2.
+ */
+export const splitCompoundQuestion = (question) => {
+    const q = String(question || '').trim();
+    const firstQ = q.indexOf('¿');
+    const lead = firstQ > 0 ? q.slice(0, firstQ).trim() : '';
+    const body = firstQ > 0 ? q.slice(firstQ) : q;
+    const splitRe = new RegExp(`,?\\s*${COMPOUND_CONNECTOR_RE.source}`, 'giu');
+    const parts = body
+        .split('?')
+        .flatMap(p => p.split(splitRe))
+        .map(p => p.replace(/^[\s¿,;]+|[\s?,;.]+$/g, '').trim())
+        .filter(p => p.split(/\s+/).length >= 3);
+    if (parts.length < 2) return [];
+    return parts.slice(0, 3).map(p => `${lead ? lead + ' ' : ''}¿${p}?`);
 };

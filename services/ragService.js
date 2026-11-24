@@ -535,6 +535,21 @@ class RagService {
                 neural_metrics: neuralMetrics,
             });
 
+            // ── Sección nombrada en la pregunta (2026-11-24) ─────────────────
+            // Si la pregunta nombra el título de una sección recuperada ("recursos
+            // de la empresa" ↔ "## 11. Recursos de la Empresa"), ese chunk pasa al
+            // primer lugar: en la prueba TI quedaba 4.º tras artículos del RIT
+            // traídos por BM25 y el modelo concluía que "el documento trata de
+            // procedimientos disciplinarios". También es señal temática (gate abajo).
+            const headingHit = this._queryNamesRetrievedHeading(spellCorrectedQuery, reranked.slice(0, 10));
+            if (headingHit) {
+                console.log(`[SectionNamed] La pregunta nombra la sección "${headingHit.title}" (pos. ${headingHit.index + 1})`);
+                if (headingHit.index > 0) {
+                    const [hit] = reranked.splice(headingHit.index, 1);
+                    reranked.unshift(hit);
+                }
+            }
+
             // ── ETAPA 5: Construcción de contexto & Retrieval Confidence ──
             const startContext = Date.now();
             const { contextText, chunksUsed, sources, sourceTexts, extraHints, rawConfidence, bestKeywordScore, bestHasSectionRelevance, logDetails } =
@@ -624,12 +639,18 @@ class RagService {
             // Calibración (benchmark_100 + 12 fuera de dominio, colección p0):
             // fuera de dominio y trampas de categoría C ≤ 0.537; preguntas
             // válidas sin vocabulario ≥ 0.603. Umbral 0.60.
+            // (2026-11-24) Señal por título de sección: la pregunta nombra el título
+            // de una sección recuperada. Caso TI: '¿qué se considera "recursos de
+            // la empresa"…?' — "empresa" es stopword, "recursos" no está en el
+            // vocabulario HR y la similitud fue 0.565 → se rechazaba sin LLM aunque
+            // "## 11. Recursos de la Empresa" estaba en el top del retrieval.
             const TOPICAL_SIMILARITY_BYPASS = 0.60;
             const hasTopicalSignal = expanded_terms.length > 0
                 || foundAcronyms.length > 0
                 || docPriority.boost.length > 0
                 || this._hasHRDomainToken(spellCorrectedQuery)
-                || rawConfidence >= TOPICAL_SIMILARITY_BYPASS;
+                || rawConfidence >= TOPICAL_SIMILARITY_BYPASS
+                || !!headingHit;
 
             if (!contextText || chunksUsed === 0 || safeConfidence < 0.20 || isEntityHallucination || !hasTopicalSignal) {
                 const noContextResp = {
@@ -728,6 +749,24 @@ class RagService {
                         }
                         builtText = p.text;
                         if (p.replacedAll) finalCitations = '';
+                    }
+                    // (2026-11-24) Última defensa: una línea final que termina en ":" es
+                    // una introducción de lista sin la lista ("…a través de:", prueba
+                    // TI Sección 3; o "Área Blanca:" vacía tras quitar oraciones
+                    // repetidas). Se quitan esas líneas; si no queda contenido real,
+                    // "sin información" — nunca "Respuesta encontrada" vacía.
+                    if (/:\s*$/.test(String(builtText).trim())) {
+                        const lines = String(builtText).trim().split('\n');
+                        while (lines.length && (/:\s*$/.test(lines[lines.length - 1]) || !lines[lines.length - 1].trim())) lines.pop();
+                        const rest = lines.join('\n').trim();
+                        if (rest.replace(/[\s\-*•#]/g, '').length < 40) {
+                            console.log(`[DanglingList] Respuesta = introducción sin contenido → sin información | query="${query}"`);
+                            builtText = SYSTEM_MESSAGES.INSUFFICIENT_CONTEXT;
+                            finalCitations = '';
+                        } else {
+                            console.log(`[DanglingList] Encabezado final vacío eliminado | query="${query}"`);
+                            builtText = rest;
+                        }
                     }
                 }
 
@@ -1370,6 +1409,37 @@ class RagService {
         if (tokens.length === 0) return false;
 
         return tokens.some(t => this._matchesVocab(t, this._hrVocabOnly));
+    }
+
+    /**
+     * ¿La pregunta nombra el título de una sección recuperada? (2026-11-24)
+     * Toma los encabezados markdown de los chunks (sin numeración "11." ni
+     * "ARTÍCULO 90.") y exige que el título aparezca COMO FRASE en la pregunta
+     * (2 a 6 palabras de contenido, tolerando plural y artículos/preposiciones
+     * entre ellas). Palabras sueltas no bastan: "Control del Documento" coincidía
+     * con "…sistemas de gestión y control… del documento". Títulos de una sola
+     * palabra ("Objetivo") no cuentan.
+     * Devuelve { title, index } (índice del chunk en `chunks`) o null.
+     */
+    _queryNamesRetrievedHeading(query, chunks) {
+        const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+        const FILLER = '(?:de|del|la|las|el|los|y|e|en|a|al|para|por|con|su|sus|una?|o)';
+        const q = ` ${norm(query)} `;
+        for (let i = 0; i < (chunks || []).length; i++) {
+            const text = chunks[i]?.payload?.texto_original || '';
+            for (const line of text.match(/^#{1,4}\s+.+$/gm) || []) {
+                const title = line.replace(/^#+\s*/, '').trim();
+                const words = norm(title.replace(/^art[ií]culo\s+\d+\s*\.?\s*/i, '').replace(/^\d+(\.\d+)*\.?\s*/, ''))
+                    .split(' ')
+                    .filter(w => w && !new RegExp(`^${FILLER}$`).test(w));
+                if (words.length < 2 || words.length > 6 || words.some(w => w.length < 3)) continue;
+                const stemmed = words.map(w => w.replace(/(es|s)$/, '') + '(?:es|s)?');
+                const re = new RegExp(`\\s${stemmed.join(`(?:\\s+${FILLER})*\\s+`)}\\s`);
+                if (re.test(q)) return { title, index: i };
+            }
+        }
+        return null;
     }
 
     // ─── Limpieza de texto ─────────────────────────────────────────────────
