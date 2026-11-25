@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { HandsHelpingIcon, TimesIcon, CommentDotsIcon } from './shared.jsx';
 
 /**
- * AboutRitaModal — "¿Qué es RITA?" (2026-10-13).
+ * AboutRitaModal — "¿Qué es RITIA?" (2026-10-13).
  * Pequeña sección explicativa sobre el nombre y el funcionamiento del
  * asistente, abierta desde un enlace en HomeView. Mismo patrón visual que
  * los demás modales del kiosco (PIN admin, aviso de inactividad).
@@ -26,7 +26,7 @@ const AboutRitaModal = ({ isOpen, onClose }) => {
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-brand"><HandsHelpingIcon size={24} /></div>
                             <div>
-                                <h2 className="text-xl text-kiosk-text font-bold tracking-tight">¿Qué es RITA?</h2>
+                                <h2 className="text-xl text-kiosk-text font-bold tracking-tight">¿Qué es RITIA?</h2>
                                 <p className="text-xs text-kiosk-muted uppercase tracking-widest mt-1">Tu asistente de RRHH</p>
                             </div>
                         </div>
@@ -40,22 +40,22 @@ const AboutRitaModal = ({ isOpen, onClose }) => {
 
                     <div className="overflow-y-auto custom-scrollbar pr-1 space-y-4 text-sm md:text-[15px] text-kiosk-text leading-relaxed">
                         <p>
-                            RITA es tu asistente virtual de Recursos Humanos en Plastitec. Su nombre viene del
+                            RITIA es tu asistente virtual de Recursos Humanos en Plastitec. Su nombre viene del
                             <strong className="font-semibold"> Reglamento Interno de Trabajo (R.I.T.)</strong>, que es
-                            justamente la base de la información que maneja, combinado con una "A" de
-                            <strong className="font-semibold"> Asistente</strong>, porque la idea es que sea como
-                            preguntarle a alguien del equipo de RRHH.
+                            justamente la base de la información que maneja, combinado con
+                            <strong className="font-semibold"> IA (Inteligencia Artificial)</strong>, la tecnología con la
+                            que responde. La idea es que sea como preguntarle a alguien del equipo de RRHH.
                         </p>
                         <p>
                             Puedes hablarle o escribirle tus dudas sobre permisos, vacaciones, horarios, políticas
-                            internas y demás temas del reglamento, y RITA te responde al instante
+                            internas y demás temas del reglamento, y RITIA te responde al instante
                             <strong className="font-semibold"> consultando siempre los documentos oficiales vigentes</strong>,
                             no una respuesta guardada de antes. Así, si RRHH actualiza una política, basta con
-                            cargar el documento actualizado para que RITA la tenga en cuenta en tu próxima consulta.
+                            cargar el documento actualizado para que RITIA la tenga en cuenta en tu próxima consulta.
                         </p>
                         <p className="bg-kiosk-panel border border-kiosk-border rounded-xl p-4 text-kiosk-muted flex items-start gap-2">
                             <span className="text-brand shrink-0 mt-0.5"><CommentDotsIcon size={16} /></span>
-                            <span>Si en algún momento tu pregunta es muy puntual o sensible, RITA te dirá que es mejor
+                            <span>Si en algún momento tu pregunta es muy puntual o sensible, RITIA te dirá que es mejor
                             hablarlo directamente con el equipo de RRHH.</span>
                         </p>
                     </div>

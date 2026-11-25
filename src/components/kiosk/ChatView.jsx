@@ -381,7 +381,7 @@ const ChatView = ({ onHome, onNavigate, autoQuery, onAutoQueryConsumed, onConten
     return (
         <section className="flex-1 flex flex-col h-full overflow-hidden bg-kiosk-bg">
             <ViewTopBar
-                title="RITA"
+                title="RITIA"
                 onHome={onHome}
                 action={
                     <div className="flex items-center gap-3">

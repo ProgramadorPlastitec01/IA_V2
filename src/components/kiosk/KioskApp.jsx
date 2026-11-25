@@ -14,7 +14,7 @@ import { HandsHelpingIcon, FlaskIcon, SyncAltIcon, HourglassHalfIcon, LockIcon, 
 // Kiosco compartido: si hay una pregunta/respuesta o un borrador de sugerencia
 // en pantalla y nadie interactúa en 60 segundos, se avisa con cuenta regresiva
 // antes de reiniciar — así la siguiente persona no hereda la consulta anterior.
-// El reloj de esos 60s se reinicia explícitamente en cuanto RITA entrega una
+// El reloj de esos 60s se reinicia explícitamente en cuanto RITIA entrega una
 // respuesta (ver onAnswerDelivered más abajo), no solo con actividad genérica
 // del mouse/touch — si no, el tiempo que tarda el LLM en responder (varios
 // segundos) se comía parte de la ventana antes de que la persona pudiera leer.
@@ -227,10 +227,10 @@ const KioskApp = () => {
                 <div className="flex items-center space-x-2 md:space-x-3 shrink-0">
                     <button
                         onClick={() => setIsAboutOpen(true)}
-                        title="¿Qué es RITA?"
+                        title="¿Qué es RITIA?"
                         className="hidden sm:flex items-center space-x-1.5 bg-kiosk-panel hover:bg-kiosk-card-hover px-3 py-1.5 rounded-full border border-kiosk-border text-xs text-brand font-semibold shadow-sm transition-colors"
                     >
-                        <HandsHelpingIcon size={14} /><span>¿Qué es RITA?</span>
+                        <HandsHelpingIcon size={14} /><span>¿Qué es RITIA?</span>
                     </button>
                     <div className="hidden sm:flex items-center space-x-2 bg-kiosk-panel px-3 py-1.5 rounded-full border border-kiosk-border text-xs text-kiosk-muted shadow-sm">
                         <span className={`w-2.5 h-2.5 rounded-full ${systemOnline ? 'bg-kiosk-accent animate-pulse' : 'bg-rose-400'}`} />
@@ -316,7 +316,7 @@ const KioskApp = () => {
                 )}
             </AnimatePresence>
 
-            {/* ── Modal: ¿Qué es RITA? ───────────────────────────────────── */}
+            {/* ── Modal: ¿Qué es RITIA? ───────────────────────────────────── */}
             <AboutRitaModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
 
             {/* ── Footer global: aviso de fase de pruebas ────────────────── */}

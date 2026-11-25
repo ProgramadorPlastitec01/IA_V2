@@ -23,7 +23,7 @@ const DocumentsView = ({ onHome, onNavigate }) => {
                 onHome={onHome}
                 action={
                     <button onClick={() => onNavigate('chat')} className="bg-blue-50 hover:bg-blue-100 text-kiosk-accent px-3 py-1.5 rounded-xl border border-blue-200 text-xs font-semibold flex items-center space-x-1.5 shadow-sm">
-                        <HandsHelpingIcon size={14} /><span>Preguntar a RITA</span>
+                        <HandsHelpingIcon size={14} /><span>Preguntar a RITIA</span>
                     </button>
                 }
             />

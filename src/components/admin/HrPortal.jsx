@@ -43,7 +43,7 @@ const HrPortal = ({ onClose }) => {
                     </div>
                     <div>
                         <h1 className="text-lg font-semibold text-admin-ink leading-tight">Portal RRHH</h1>
-                        <p className="text-xs text-admin-muted">Revisión y aprobación de respuestas de RITA</p>
+                        <p className="text-xs text-admin-muted">Revisión y aprobación de respuestas de RITIA</p>
                     </div>
                 </div>
                 <button

@@ -1,6 +1,6 @@
 # Documentación Técnica de Arquitectura: Asistente RRHH Plastitec (IA)
 
-Este documento detalla la arquitectura, el funcionamiento interno y la integración de servicios del **Asistente de Recursos Humanos de Plastitec** ("RITA"), una solución de IA conversacional 100% local (sin dependencias cloud de inferencia) para automatizar consultas sobre el Reglamento Interno de Trabajo (RIT) y políticas corporativas.
+Este documento detalla la arquitectura, el funcionamiento interno y la integración de servicios del **Asistente de Recursos Humanos de Plastitec** ("RITIA"), una solución de IA conversacional 100% local (sin dependencias cloud de inferencia) para automatizar consultas sobre el Reglamento Interno de Trabajo (RIT) y políticas corporativas.
 
 > Nota: este documento reemplaza una versión anterior que describía una arquitectura basada en NotebookLM vía MCP. Esa arquitectura fue sustituida por el pipeline RAG local (Qdrant + Ollama) descrito aquí.
 
@@ -205,11 +205,11 @@ Objetivo: responder en menos de 1 s las preguntas repetidas, con un texto que un
 
 ### Shell principal: `KioskApp.jsx`
 Reemplazó al antiguo `VoiceChat.jsx` / `ChatShell` de 2 paneles (rediseño 2026-10-09, tema claro, kiosco táctil). Vistas disponibles (`src/components/kiosk/`):
-- `HomeView` — pantalla de bienvenida ("Pregúntale a RITA" + accesos directos).
+- `HomeView` — pantalla de bienvenida ("Pregúntale a RITIA" + accesos directos).
 - `ChatView` — pregunta → respuesta (texto o voz), feedback 😞/😐/😊, botón "Escuchar"/"Copiar".
 - `DocumentsView`, `FaqView`, `GuideView` — documentos disponibles, preguntas frecuentes, guía de uso.
 - `SuggestionsView` — buzón de sugerencias.
-- `AboutRitaModal` — modal "¿Qué es RITA?".
+- `AboutRitaModal` — modal "¿Qué es RITIA?".
 
 ### Auto-reinicio por inactividad (kiosco compartido)
 Si hay una pregunta/respuesta o un borrador de sugerencia en pantalla y nadie interactúa en **30 segundos**, se muestra un modal "¿Sigues ahí?" con cuenta regresiva de 10s antes de reiniciar a Inicio — así la siguiente persona no hereda la consulta anterior. Solo se activa en las vistas `chat` y `suggestions` (no en Inicio/Documentos/FAQs/Guía).

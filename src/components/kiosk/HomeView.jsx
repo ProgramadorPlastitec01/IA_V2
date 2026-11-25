@@ -43,7 +43,7 @@ const HomeView = ({ onNavigate }) => (
                         <HandsHelpingIcon size={28} />
                     </div>
                     <span className="inline-block bg-brand-light text-brand text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-2">Recomendado</span>
-                    <h3 className="text-2xl md:text-3xl font-bold text-kiosk-text group-hover:text-brand transition-colors">Pregúntale a RITA</h3>
+                    <h3 className="text-2xl md:text-3xl font-bold text-kiosk-text group-hover:text-brand transition-colors">Pregúntale a RITIA</h3>
                     <p className="text-sm md:text-base text-kiosk-muted mt-2">Resuelve tus dudas al instante sobre políticas, vacaciones, permisos y reglamentos de la empresa.</p>
                 </div>
                 <div className="mt-6 flex items-center justify-between pt-4 border-t border-kiosk-border">

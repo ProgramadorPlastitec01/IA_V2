@@ -5,7 +5,7 @@ import { useDocuments } from './useDocuments.js';
 import DocMeta from './DocMeta.jsx';
 
 /**
- * DocumentsModal — documentos oficiales que consulta RITA, con código, versión
+ * DocumentsModal — documentos oficiales que consulta RITIA, con código, versión
  * y fecha de cada uno. Se abre desde el botón "Documentos" del chat; se monta
  * solo mientras está abierto, así cada apertura consulta la lista vigente.
  * Mismo patrón visual que AboutRitaModal.
@@ -36,7 +36,7 @@ const DocumentsModal = ({ onClose }) => {
                         <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-brand"><FileAltIcon size={24} /></div>
                         <div>
                             <h2 className="text-xl text-kiosk-text font-bold tracking-tight">Documentos oficiales</h2>
-                            <p className="text-xs text-kiosk-muted mt-1">Lo que RITA consulta para responderte, con su código y versión.</p>
+                            <p className="text-xs text-kiosk-muted mt-1">Lo que RITIA consulta para responderte, con su código y versión.</p>
                         </div>
                     </div>
                     <button

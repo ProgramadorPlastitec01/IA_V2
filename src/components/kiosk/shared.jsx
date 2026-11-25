@@ -164,7 +164,7 @@ export const ChevronRightIcon = () => (
 export const ArrowLeftIcon = () => (
     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
 );
-// Font Awesome Free 5.15.4 "hands-helping" (solid) — icono de RITA/asistencia.
+// Font Awesome Free 5.15.4 "hands-helping" (solid) — icono de RITIA/asistencia.
 // https://fontawesome.com/v5/icons/hands-helping · CC BY 4.0. Inline (no CDN)
 // para mantener el kiosco 100% offline-safe, igual que el resto de íconos.
 export const HandsHelpingIcon = ({ size = 22 }) => (
